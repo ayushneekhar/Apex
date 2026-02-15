@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Animated, {
   Easing,
   Extrapolation,
@@ -9,9 +9,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
 import { AppText } from './app-text';
+import { styles } from './overload-button.styles';
 
 type OverloadButtonProps = {
   disabled?: boolean;
@@ -21,6 +23,7 @@ type OverloadButtonProps = {
 export function OverloadButton({ disabled = false, onPress }: OverloadButtonProps) {
   const theme = useAppTheme();
   const progress = useSharedValue(0);
+  const { motion, opacity, sizes } = designTokens;
 
   const textAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -52,7 +55,7 @@ export function OverloadButton({ disabled = false, onPress }: OverloadButtonProp
   const triggerAnimation = () => {
     progress.value = 0;
     progress.value = withTiming(1, {
-      duration: 520,
+      duration: motion.overloadDurationMs,
       easing: Easing.out(Easing.quad),
     });
   };
@@ -69,7 +72,7 @@ export function OverloadButton({ disabled = false, onPress }: OverloadButtonProp
         {
           borderColor: theme.palette.border,
           backgroundColor: theme.palette.panelSoft,
-          opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
+          opacity: disabled ? opacity.disabled : pressed ? opacity.pressedStrong : 1,
         },
       ]}>
       <View style={styles.content}>
@@ -80,30 +83,9 @@ export function OverloadButton({ disabled = false, onPress }: OverloadButtonProp
         </Animated.View>
 
         <Animated.View style={[styles.layer, iconAnimatedStyle]}>
-          <Ionicons name="flash" size={14} color={theme.palette.accent} />
+          <Ionicons name="flash" size={sizes.iconTiny} color={theme.palette.accent} />
         </Animated.View>
       </View>
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  base: {
-    borderWidth: 1,
-    borderRadius: 14,
-    minHeight: 44,
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-  },
-  content: {
-    minHeight: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  layer: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

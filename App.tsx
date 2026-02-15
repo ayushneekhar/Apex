@@ -16,12 +16,13 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { createTabScreenOptions, styles } from '@/App.styles';
 import type { AppTheme } from '@/constants/app-themes';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import AnalyticsScreen from '@/screens/AnalyticsScreen';
 import HistoryScreen from '@/screens/HistoryScreen';
-import WorkoutsScreen from '@/screens/WorkoutsScreen';
 import SettingsScreen from '@/screens/SettingsScreen';
+import WorkoutsScreen from '@/screens/WorkoutsScreen';
 import { useAppStore } from '@/store/use-app-store';
 
 void SplashScreen.preventAutoHideAsync();
@@ -35,26 +36,7 @@ function RootTabs({ navigationTheme, theme }: { navigationTheme: Theme; theme: A
     <NavigationContainer theme={navigationTheme}>
       <Tab.Navigator
         initialRouteName="Workouts"
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: theme.palette.accent,
-          tabBarInactiveTintColor: theme.palette.textMuted,
-          tabBarStyle: {
-            backgroundColor: theme.palette.panel,
-            borderTopColor: theme.palette.border,
-            borderTopWidth: 1,
-            height: 56 + insets.bottom,
-            paddingTop: 6,
-            paddingBottom: Math.max(insets.bottom, 6),
-          },
-          tabBarLabelStyle: {
-            fontFamily: 'Unbounded_500Medium',
-            fontSize: 10,
-            textTransform: 'uppercase',
-            letterSpacing: 0.7,
-            marginBottom: 2,
-          },
-        }}>
+        screenOptions={createTabScreenOptions(theme, insets)}>
         <Tab.Screen
           name="Workouts"
           component={WorkoutsScreen}
@@ -136,7 +118,7 @@ export default function App() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <KeyboardProvider>
         <SafeAreaProvider>
           <RootTabs navigationTheme={navigationTheme} theme={theme} />

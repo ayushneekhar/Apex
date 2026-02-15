@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo } from 'react';
+import { ScrollView, View } from 'react-native';
+import { type lineDataItem, LineChart } from 'react-native-gifted-charts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonGridBackground } from '@/components/ui/neon-grid-background';
+import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatWeightFromKg } from '@/lib/weight';
 import { useAppStore } from '@/store/use-app-store';
+import { styles } from './AnalyticsScreen.styles';
 
 type SessionSummary = {
   workoutName: string;
@@ -20,7 +23,6 @@ type SessionSummary = {
 };
 
 type MetricPoint = {
-  id: string;
   label: string;
   valueKg: number;
 };
@@ -35,13 +37,17 @@ function toPercentChange(start: number, end: number): string {
   return `${sign}${delta.toFixed(1)}%`;
 }
 
-function MetricBarChart({
+function MetricLineChart({
   points,
-  accentColor,
+  lineColor,
+  fillEndColor,
+  axisColor,
   mutedColor,
 }: {
   points: MetricPoint[];
-  accentColor: string;
+  lineColor: string;
+  fillEndColor: string;
+  axisColor: string;
   mutedColor: string;
 }) {
   if (points.length === 0) {
@@ -52,34 +58,62 @@ function MetricBarChart({
     );
   }
 
-  const maxValue = Math.max(...points.map((point) => point.valueKg), 1);
+  const labelStride = points.length > 6 ? 2 : 1;
+  const baseData: lineDataItem[] = points.map((point, index) => ({
+    value: Number(point.valueKg.toFixed(2)),
+    label: index % labelStride === 0 ? point.label : '',
+  }));
+  const hasSinglePoint = baseData.length === 1;
+  const chartData: lineDataItem[] = hasSinglePoint
+    ? [
+        baseData[0],
+        {
+          value: baseData[0].value,
+          label: '',
+          hideDataPoint: true,
+        },
+      ]
+    : baseData;
+  const peakValue = Math.max(...chartData.map((point) => point.value ?? 0), 1);
 
   return (
     <View style={styles.chartWrap}>
-      <View style={styles.chartBarsRow}>
-        {points.map((point) => {
-          const normalized = Math.max(0.06, point.valueKg / maxValue);
-
-          return (
-            <View key={point.id} style={styles.chartBarCell}>
-              <View style={styles.chartBarTrack}>
-                <View
-                  style={[
-                    styles.chartBar,
-                    {
-                      height: `${Math.round(normalized * 100)}%`,
-                      backgroundColor: accentColor,
-                    },
-                  ]}
-                />
-              </View>
-              <AppText variant="micro" tone="muted" style={[styles.chartLabel, { color: mutedColor }]}>
-                {point.label}
-              </AppText>
-            </View>
-          );
-        })}
-      </View>
+      <LineChart
+        areaChart={!hasSinglePoint}
+        curved={!hasSinglePoint}
+        isAnimated
+        animateOnDataChange
+        animationDuration={850}
+        data={chartData}
+        height={188}
+        noOfSections={4}
+        maxValue={Math.ceil(peakValue * 1.08)}
+        thickness={3}
+        color={lineColor}
+        startFillColor={lineColor}
+        endFillColor={fillEndColor}
+        startOpacity={0.26}
+        endOpacity={0.06}
+        yAxisColor={axisColor}
+        xAxisColor={axisColor}
+        rulesColor={axisColor}
+        yAxisTextStyle={[styles.chartAxisText, { color: mutedColor }]}
+        xAxisLabelTextStyle={[styles.chartAxisText, { color: mutedColor }]}
+        yAxisLabelWidth={44}
+        hideDataPoints={false}
+        dataPointsRadius={4}
+        dataPointsColor={lineColor}
+        adjustToWidth
+        spacing={42}
+        initialSpacing={10}
+        endSpacing={10}
+        xAxisLabelsHeight={36}
+        xAxisLabelsVerticalShift={8}
+        hideOrigin
+        showVerticalLines={false}
+        showXAxisIndices={false}
+        showYAxisIndices={false}
+      />
     </View>
   );
 }
@@ -87,11 +121,10 @@ function MetricBarChart({
 export default function AnalyticsScreen() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { layout } = designTokens;
 
   const workouts = useAppStore((state) => state.workouts);
   const settings = useAppStore((state) => state.settings);
-
-  const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
 
   const sessionLabelFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
@@ -186,40 +219,28 @@ export default function AnalyticsScreen() {
     return [...exerciseProgress.keys()].sort((a, b) => a.localeCompare(b));
   }, [exerciseProgress]);
 
-  useEffect(() => {
-    if (exerciseNames.length === 0) {
-      setSelectedExercise(null);
-      return;
-    }
+  const exerciseAnalyticsCards = useMemo(() => {
+    return exerciseNames.map((exerciseName) => {
+      const series = exerciseProgress.get(exerciseName) ?? [];
 
-    if (!selectedExercise || !exerciseProgress.has(selectedExercise)) {
-      setSelectedExercise(exerciseNames[0]);
-    }
-  }, [exerciseNames, exerciseProgress, selectedExercise]);
-
-  const selectedSeries = useMemo(() => {
-    if (!selectedExercise) {
-      return [];
-    }
-
-    return exerciseProgress.get(selectedExercise) ?? [];
-  }, [exerciseProgress, selectedExercise]);
-
-  const recentExercisePoints = useMemo(() => {
-    return selectedSeries.slice(-10).map((point, index) => ({
-      id: `${point.performedAt}-${index}`,
-      label: sessionLabelFormatter.format(new Date(point.performedAt)),
-      valueKg: point.valueKg,
-    }));
-  }, [selectedSeries, sessionLabelFormatter]);
+      return {
+        exerciseName,
+        points: series.slice(-10).map((point) => ({
+          label: sessionLabelFormatter.format(new Date(point.performedAt)),
+          valueKg: point.valueKg,
+        })),
+        startValueKg: series.length > 0 ? series[0].valueKg : null,
+        latestValueKg: series.length > 0 ? series[series.length - 1].valueKg : null,
+      };
+    });
+  }, [exerciseNames, exerciseProgress, sessionLabelFormatter]);
 
   const bodyweightSeries = useMemo(() => {
     return allSessions.filter((session) => session.bodyweightKg !== null && session.bodyweightKg > 0);
   }, [allSessions]);
 
   const recentBodyweightPoints = useMemo(() => {
-    return bodyweightSeries.slice(-10).map((session, index) => ({
-      id: `${session.performedAt}-bw-${index}`,
+    return bodyweightSeries.slice(-10).map((session) => ({
       label: sessionLabelFormatter.format(new Date(session.performedAt)),
       valueKg: session.bodyweightKg ?? 0,
     }));
@@ -227,9 +248,6 @@ export default function AnalyticsScreen() {
 
   const sessionCount = allSessions.length;
   const latestSession = allSessions.length > 0 ? allSessions[allSessions.length - 1] : null;
-
-  const exerciseStart = selectedSeries.length > 0 ? selectedSeries[0].valueKg : null;
-  const exerciseLatest = selectedSeries.length > 0 ? selectedSeries[selectedSeries.length - 1].valueKg : null;
 
   const bodyweightStart = bodyweightSeries.length > 0 ? bodyweightSeries[0].bodyweightKg : null;
   const bodyweightLatest =
@@ -252,8 +270,8 @@ export default function AnalyticsScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + 12,
-            paddingBottom: insets.bottom + 96,
+            paddingTop: insets.top + layout.screenTopInset,
+            paddingBottom: insets.bottom + layout.screenBottomInset,
           },
         ]}
         showsVerticalScrollIndicator={false}>
@@ -310,87 +328,77 @@ export default function AnalyticsScreen() {
           ]}>
           <AppText variant="heading">Exercise Progression</AppText>
 
-          {exerciseNames.length > 0 ? (
-            <View style={styles.exerciseChipWrap}>
-              {exerciseNames.map((exerciseName) => {
-                const selected = selectedExercise === exerciseName;
+          {exerciseAnalyticsCards.length > 0 ? (
+            <View style={styles.exercisePanelsWrap}>
+              {exerciseAnalyticsCards.map((exerciseCard) => (
+                <View
+                  key={exerciseCard.exerciseName}
+                  style={[
+                    styles.exercisePanel,
+                    {
+                      borderColor: theme.palette.border,
+                      backgroundColor: theme.palette.panelSoft,
+                    },
+                  ]}>
+                  <AppText variant="label">{exerciseCard.exerciseName}</AppText>
 
-                return (
-                  <Pressable
-                    key={exerciseName}
-                    onPress={() => setSelectedExercise(exerciseName)}
-                    style={({ pressed }) => [
-                      styles.exerciseChip,
-                      {
-                        borderColor: selected ? theme.palette.accent : theme.palette.border,
-                        backgroundColor: selected ? `${theme.palette.accent}2a` : theme.palette.panelSoft,
-                        opacity: pressed ? 0.85 : 1,
-                      },
-                    ]}>
-                    <AppText variant="micro" tone={selected ? 'accent' : 'muted'}>
-                      {exerciseName}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
+                  <MetricLineChart
+                    points={exerciseCard.points}
+                    lineColor={theme.palette.accent}
+                    fillEndColor={theme.palette.panelSoft}
+                    axisColor={theme.palette.border}
+                    mutedColor={theme.palette.textMuted}
+                  />
+
+                  <View style={styles.metricRow}>
+                    <View
+                      style={[
+                        styles.metricCard,
+                        {
+                          borderColor: theme.palette.border,
+                          backgroundColor: theme.palette.panel,
+                        },
+                      ]}>
+                      <AppText variant="micro" tone="muted">
+                        First Avg Load
+                      </AppText>
+                      <AppText tone="accent">
+                        {exerciseCard.startValueKg === null
+                          ? 'N/A'
+                          : formatWeightFromKg(Math.abs(exerciseCard.startValueKg), settings.weightUnit)}
+                      </AppText>
+                    </View>
+                    <View
+                      style={[
+                        styles.metricCard,
+                        {
+                          borderColor: theme.palette.border,
+                          backgroundColor: theme.palette.panel,
+                        },
+                      ]}>
+                      <AppText variant="micro" tone="muted">
+                        Latest Avg Load
+                      </AppText>
+                      <AppText tone="accent">
+                        {exerciseCard.latestValueKg === null
+                          ? 'N/A'
+                          : formatWeightFromKg(Math.abs(exerciseCard.latestValueKg), settings.weightUnit)}
+                      </AppText>
+                    </View>
+                  </View>
+
+                  <AppText tone="muted">
+                    Change:{' '}
+                    {exerciseCard.startValueKg !== null && exerciseCard.latestValueKg !== null
+                      ? toPercentChange(Math.abs(exerciseCard.startValueKg), Math.abs(exerciseCard.latestValueKg))
+                      : 'N/A'}
+                  </AppText>
+                </View>
+              ))}
             </View>
           ) : (
             <AppText tone="muted">Complete workouts to unlock exercise analytics.</AppText>
           )}
-
-          {selectedExercise ? (
-            <>
-              <MetricBarChart
-                points={recentExercisePoints}
-                accentColor={theme.palette.accent}
-                mutedColor={theme.palette.textMuted}
-              />
-
-              <View style={styles.metricRow}>
-                <View
-                  style={[
-                    styles.metricCard,
-                    {
-                      borderColor: theme.palette.border,
-                      backgroundColor: theme.palette.panelSoft,
-                    },
-                  ]}>
-                  <AppText variant="micro" tone="muted">
-                    First Avg Load
-                  </AppText>
-                  <AppText tone="accent">
-                    {exerciseStart === null
-                      ? 'N/A'
-                      : formatWeightFromKg(Math.abs(exerciseStart), settings.weightUnit)}
-                  </AppText>
-                </View>
-                <View
-                  style={[
-                    styles.metricCard,
-                    {
-                      borderColor: theme.palette.border,
-                      backgroundColor: theme.palette.panelSoft,
-                    },
-                  ]}>
-                  <AppText variant="micro" tone="muted">
-                    Latest Avg Load
-                  </AppText>
-                  <AppText tone="accent">
-                    {exerciseLatest === null
-                      ? 'N/A'
-                      : formatWeightFromKg(Math.abs(exerciseLatest), settings.weightUnit)}
-                  </AppText>
-                </View>
-              </View>
-
-              <AppText tone="muted">
-                Change:{' '}
-                {exerciseStart !== null && exerciseLatest !== null
-                  ? toPercentChange(Math.abs(exerciseStart), Math.abs(exerciseLatest))
-                  : 'N/A'}
-              </AppText>
-            </>
-          ) : null}
         </View>
 
         <View
@@ -403,9 +411,11 @@ export default function AnalyticsScreen() {
           ]}>
           <AppText variant="heading">Bodyweight Trend</AppText>
 
-          <MetricBarChart
+          <MetricLineChart
             points={recentBodyweightPoints}
-            accentColor={theme.palette.accentSecondary}
+            lineColor={theme.palette.accentSecondary}
+            fillEndColor={theme.palette.panelSoft}
+            axisColor={theme.palette.border}
             mutedColor={theme.palette.textMuted}
           />
 
@@ -453,94 +463,3 @@ export default function AnalyticsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  hero: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
-    gap: 8,
-  },
-  summaryRow: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  summaryCell: {
-    flex: 1,
-    gap: 5,
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-    gap: 10,
-  },
-  exerciseChipWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  exerciseChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  chartWrap: {
-    paddingTop: 6,
-  },
-  chartBarsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-    minHeight: 136,
-  },
-  chartBarCell: {
-    flex: 1,
-    gap: 6,
-    alignItems: 'center',
-  },
-  chartBarTrack: {
-    width: '100%',
-    minHeight: 110,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-    justifyContent: 'flex-end',
-    padding: 4,
-  },
-  chartBar: {
-    width: '100%',
-    borderRadius: 8,
-    minHeight: 6,
-  },
-  chartLabel: {
-    textAlign: 'center',
-  },
-  chartEmpty: {
-    borderRadius: 12,
-    paddingVertical: 18,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  metricRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  metricCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 6,
-  },
-});

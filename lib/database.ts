@@ -213,6 +213,10 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
       typeof activeSet.restSeconds === 'number' && activeSet.restSeconds > 0
         ? Math.floor(activeSet.restSeconds)
         : DEFAULT_REST_SECONDS;
+    const normalizedActualWeightKg =
+      typeof activeSet.actualWeightKg === 'number' && Number.isFinite(activeSet.actualWeightKg)
+        ? activeSet.actualWeightKg
+        : activeSet.targetWeightKg;
 
     return (
       typeof activeSet.id === 'string' &&
@@ -221,6 +225,8 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
       typeof activeSet.setNumber === 'number' &&
       typeof activeSet.targetReps === 'number' &&
       typeof activeSet.targetWeightKg === 'number' &&
+      typeof normalizedActualWeightKg === 'number' &&
+      Number.isFinite(normalizedActualWeightKg) &&
       typeof normalizedRestSeconds === 'number' &&
       typeof activeSet.actualReps === 'number'
     );
@@ -241,6 +247,10 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
     restoredFromAppClose: session.restoredFromAppClose,
     sets: session.sets.map((set) => ({
       ...set,
+      actualWeightKg:
+        typeof set.actualWeightKg === 'number' && Number.isFinite(set.actualWeightKg)
+          ? set.actualWeightKg
+          : set.targetWeightKg,
       restSeconds:
         typeof set.restSeconds === 'number' && set.restSeconds > 0
           ? Math.floor(set.restSeconds)

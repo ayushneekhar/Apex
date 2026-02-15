@@ -1,18 +1,21 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
 import { NeonGridBackground } from '@/components/ui/neon-grid-background';
 import { THEME_OPTIONS } from '@/constants/app-themes';
+import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatWeightFromKg, getDefaultWeeklyIncrementKg } from '@/lib/weight';
 import { useAppStore } from '@/store/use-app-store';
+import { styles } from './SettingsScreen.styles';
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { layout, opacity } = designTokens;
 
   const settings = useAppStore((state) => state.settings);
   const mutating = useAppStore((state) => state.mutating);
@@ -99,8 +102,8 @@ export default function SettingsScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + 12,
-            paddingBottom: insets.bottom + 96,
+            paddingTop: insets.top + layout.screenTopInset,
+            paddingBottom: insets.bottom + layout.screenBottomInset,
           },
         ]}
         showsVerticalScrollIndicator={false}>
@@ -146,7 +149,7 @@ export default function SettingsScreen() {
                     {
                       borderColor: selected ? theme.palette.accent : theme.palette.border,
                       backgroundColor: option.palette.panel,
-                      opacity: pressed ? 0.86 : 1,
+                      opacity: pressed ? opacity.pressedMedium : 1,
                     },
                   ]}>
                   <View style={styles.themeCardTop}>
@@ -204,7 +207,7 @@ export default function SettingsScreen() {
                     styles.segment,
                     {
                       backgroundColor: selected ? theme.palette.accent : 'transparent',
-                      opacity: pressed ? 0.82 : 1,
+                      opacity: pressed ? opacity.pressedSoft : 1,
                     },
                   ]}>
                   <AppText variant="label" tone={selected ? 'inverse' : 'muted'}>
@@ -282,73 +285,3 @@ export default function SettingsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  hero: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
-    gap: 8,
-  },
-  card: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    gap: 10,
-  },
-  themeList: {
-    gap: 10,
-  },
-  themeCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 6,
-  },
-  themeCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  themeSwatch: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-  },
-  segmented: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 4,
-    flexDirection: 'row',
-  },
-  segment: {
-    flex: 1,
-    borderRadius: 8,
-    minHeight: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoList: {
-    gap: 8,
-  },
-  backupActions: {
-    gap: 8,
-  },
-  infoRow: {
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 10,
-  },
-});

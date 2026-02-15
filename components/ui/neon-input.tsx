@@ -1,9 +1,10 @@
 import type { TextInputProps } from 'react-native';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 
 import { AppText } from './app-text';
+import { styles } from './neon-input.styles';
 
 type NeonInputProps = TextInputProps & {
   label?: string;
@@ -57,28 +58,3 @@ export function NeonInput({ label, helperText, suffix, style, ...rest }: NeonInp
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    gap: 6,
-  },
-  inputShell: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    fontFamily: 'Unbounded_400Regular',
-    fontSize: 13,
-    lineHeight: 17,
-    paddingVertical: 10,
-  },
-  suffix: {
-    flexShrink: 0,
-  },
-});

@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Modal, Platform, ScrollView, StyleSheet, View, type KeyboardTypeOptions } from 'react-native';
+import { Modal, Platform, ScrollView, View, type KeyboardTypeOptions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
 import { NeonGridBackground } from '@/components/ui/neon-grid-background';
 import { NeonInput } from '@/components/ui/neon-input';
+import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatWeightFromKg, formatWeightInputFromKg, parseWeightInputToKg } from '@/lib/weight';
 import { useAppStore } from '@/store/use-app-store';
 import type { WorkoutSession } from '@/types/workout';
+import { styles } from './HistoryScreen.styles';
 
 type SessionSetDraft = {
   id: string;
@@ -36,6 +38,7 @@ function getSessionVolumeKg(session: WorkoutSession): number {
 export default function HistoryScreen() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
+  const { layout } = designTokens;
 
   const workouts = useAppStore((state) => state.workouts);
   const settings = useAppStore((state) => state.settings);
@@ -195,8 +198,8 @@ export default function HistoryScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: insets.top + 12,
-            paddingBottom: insets.bottom + 96,
+            paddingTop: insets.top + layout.screenTopInset,
+            paddingBottom: insets.bottom + layout.screenBottomInset,
           },
         ]}
         showsVerticalScrollIndicator={false}>
@@ -417,111 +420,3 @@ export default function HistoryScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  hero: {
-    borderWidth: 1,
-    borderRadius: 20,
-    padding: 16,
-    gap: 8,
-  },
-  summaryRow: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  summaryCell: {
-    flex: 1,
-    gap: 5,
-  },
-  emptyCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-  },
-  sessionCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 12,
-    gap: 10,
-  },
-  sessionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  sessionHeaderText: {
-    flex: 1,
-    gap: 4,
-  },
-  statChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statChip: {
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    minWidth: 92,
-    gap: 4,
-    alignItems: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.58)',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  modalCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 14,
-    gap: 12,
-    maxHeight: '84%',
-  },
-  modalSetList: {
-    maxHeight: 340,
-  },
-  modalSetListContent: {
-    gap: 8,
-    paddingBottom: 4,
-  },
-  modalSetCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 10,
-    gap: 8,
-  },
-  modalSetInputsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  modalSetInputCell: {
-    flex: 1,
-  },
-  errorBox: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  modalActionCell: {
-    flex: 1,
-  },
-});

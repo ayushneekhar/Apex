@@ -3,22 +3,30 @@ import { useMemo } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
+import {
+  NEON_GRID_DEFAULT_LINE_GAP,
+  NEON_GRID_MAX_HORIZONTAL_LINES,
+  NEON_GRID_MAX_VERTICAL_LINES,
+  styles,
+} from '@/components/ui/neon-grid-background.styles';
+import { designTokens } from '@/constants/design-system';
 
 type NeonGridBackgroundProps = {
   lineGap?: number;
 };
 
-export function NeonGridBackground({ lineGap = 48 }: NeonGridBackgroundProps) {
+export function NeonGridBackground({ lineGap = NEON_GRID_DEFAULT_LINE_GAP }: NeonGridBackgroundProps) {
   const theme = useAppTheme();
   const { width, height } = useWindowDimensions();
+  const { border } = designTokens;
 
   const verticalLines = useMemo(() => {
-    const count = Math.min(Math.ceil(width / lineGap) + 1, 36);
+    const count = Math.min(Math.ceil(width / lineGap) + 1, NEON_GRID_MAX_VERTICAL_LINES);
     return Array.from({ length: count }, (_, index) => index);
   }, [lineGap, width]);
 
   const horizontalLines = useMemo(() => {
-    const count = Math.min(Math.ceil(height / lineGap) + 1, 64);
+    const count = Math.min(Math.ceil(height / lineGap) + 1, NEON_GRID_MAX_HORIZONTAL_LINES);
     return Array.from({ length: count }, (_, index) => index);
   }, [height, lineGap]);
 
@@ -49,7 +57,7 @@ export function NeonGridBackground({ lineGap = 48 }: NeonGridBackgroundProps) {
             styles.verticalLine,
             {
               left: line * lineGap,
-              width: 1,
+              width: border.thin,
               backgroundColor: theme.palette.gridLine,
             },
           ]}
@@ -63,7 +71,7 @@ export function NeonGridBackground({ lineGap = 48 }: NeonGridBackgroundProps) {
             styles.horizontalLine,
             {
               top: line * lineGap,
-              height: 1,
+              height: border.thin,
               backgroundColor: theme.palette.gridLine,
             },
           ]}
@@ -72,20 +80,3 @@ export function NeonGridBackground({ lineGap = 48 }: NeonGridBackgroundProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  neonWash: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.22,
-  },
-  verticalLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-  },
-  horizontalLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
-});

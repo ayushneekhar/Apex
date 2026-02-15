@@ -60,7 +60,7 @@ type AppStoreState = {
   pauseActiveWorkoutSession: () => Promise<void>;
   resumeActiveWorkoutSession: () => Promise<void>;
   decrementOrCompleteSessionSet: (setId: string) => Promise<void>;
-  setSessionSetCustomReps: (setId: string, reps: number) => Promise<void>;
+  setSessionSetCustomValues: (setId: string, reps: number, weightKg: number) => Promise<void>;
   finishActiveWorkoutSession: () => Promise<void>;
   discardActiveWorkoutSession: () => Promise<void>;
 };
@@ -88,10 +88,32 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
       setNumber: index + 1,
       targetReps: exercise.reps,
       targetWeightKg,
+      actualWeightKg: targetWeightKg,
       restSeconds: exercise.restSeconds,
       actualReps: 0,
     }));
   });
+}
+
+function getMostRecentBodyweightKg(workouts: Workout[]): number | null {
+  let latestBodyweight: number | null = null;
+  let latestPerformedAt = -1;
+
+  workouts.forEach((workout) => {
+    workout.sessions.forEach((session) => {
+      if (
+        typeof session.bodyweightKg === 'number' &&
+        Number.isFinite(session.bodyweightKg) &&
+        session.bodyweightKg > 0 &&
+        session.performedAt > latestPerformedAt
+      ) {
+        latestBodyweight = session.bodyweightKg;
+        latestPerformedAt = session.performedAt;
+      }
+    });
+  });
+
+  return latestBodyweight;
 }
 
 function elapsedPauseMs(session: ActiveWorkoutSession, now: number): number {
@@ -398,7 +420,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       workoutId: workout.id,
       workoutName: workout.name,
       startedAt: Date.now(),
-      bodyweightKg: null,
+      bodyweightKg: getMostRecentBodyweightKg(get().workouts),
       totalPausedMs: 0,
       pauseStartedAt: null,
       isPaused: false,
@@ -494,13 +516,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
   },
-  setSessionSetCustomReps: async (setId, reps) => {
+  setSessionSetCustomValues: async (setId, reps, weightKg) => {
     const session = get().activeSession;
     if (!session) {
       return;
     }
 
     const normalizedReps = Math.max(0, Math.floor(reps));
+    const normalizedWeightKg = Number.isFinite(weightKg) ? weightKg : 0;
 
     let changed = false;
     const nextSets = session.sets.map((setEntry) => {
@@ -512,6 +535,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return {
         ...setEntry,
         actualReps: normalizedReps,
+        actualWeightKg: normalizedWeightKg,
       };
     });
 
@@ -546,7 +570,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           exerciseName: setEntry.exerciseName,
           setNumber: setEntry.setNumber,
           reps: setEntry.actualReps,
-          weightKg: setEntry.targetWeightKg,
+          weightKg: setEntry.actualWeightKg,
         })),
       });
 

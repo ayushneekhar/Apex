@@ -3,6 +3,7 @@ import { StyleSheet } from 'react-native';
 import { designTokens } from '@/constants/design-system';
 
 const { border, layout, overlay, radii, sizes, spacing } = designTokens;
+const CALENDAR_COLUMN_WIDTH = '14.285714%';
 
 export const styles = StyleSheet.create({
   screen: {
@@ -15,8 +16,8 @@ export const styles = StyleSheet.create({
   hero: {
     borderWidth: border.thin,
     borderRadius: radii.hero,
-    padding: layout.screenHorizontalInset,
-    gap: spacing.sm,
+    padding: spacing.lg,
+    gap: spacing.xxs,
   },
   summaryRow: {
     borderWidth: border.thin,
@@ -28,6 +29,82 @@ export const styles = StyleSheet.create({
   summaryCell: {
     flex: 1,
     gap: spacing.xs,
+  },
+  calendarCard: {
+    borderWidth: border.thin,
+    borderRadius: radii.panel,
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
+  calendarHeader: {
+    gap: spacing.sm,
+  },
+  calendarTitleWrap: {
+    gap: spacing.xxs,
+  },
+  calendarMonthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  calendarMonthLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontFamily: 'Unbounded_500Medium',
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  calendarNavButton: {
+    width: sizes.iconButton,
+    height: sizes.iconButton,
+    borderWidth: border.thin,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarWeekRow: {
+    flexDirection: 'row',
+  },
+  calendarWeekCell: {
+    width: CALENDAR_COLUMN_WIDTH,
+    paddingHorizontal: spacing.xxxs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarWeekLabel: {
+    width: '100%',
+    textAlign: 'center',
+  },
+  calendarGrid: {
+    gap: spacing.xxs,
+  },
+  calendarGridWeekRow: {
+    flexDirection: 'row',
+  },
+  calendarDayCellSlot: {
+    width: CALENDAR_COLUMN_WIDTH,
+    paddingHorizontal: spacing.xxxs,
+  },
+  calendarDayCell: {
+    width: '100%',
+    aspectRatio: 1,
+    borderWidth: border.thin,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calendarDayLabel: {
+    textAlign: 'center',
+    fontFamily: 'Unbounded_500Medium',
+    fontSize: 12,
+    lineHeight: 14,
+    includeFontPadding: false,
+  },
+  calendarDayLabelWrap: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyCard: {
     borderWidth: border.thin,

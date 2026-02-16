@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Modal, Platform, ScrollView, View, type KeyboardTypeOptions } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, View, type KeyboardTypeOptions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
@@ -30,9 +31,87 @@ type SessionListItem = {
 
 const WEIGHT_KEYBOARD_TYPE: KeyboardTypeOptions =
   Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric';
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+type CalendarCell = {
+  key: string;
+  dayNumber: number;
+  inCurrentMonth: boolean;
+  isWorkoutDay: boolean;
+  isToday: boolean;
+};
 
 function getSessionVolumeKg(session: WorkoutSession): number {
   return session.sets.reduce((total, setEntry) => total + Math.abs(setEntry.weightKg) * setEntry.reps, 0);
+}
+
+function toLocalDateKey(timestamp: number): string {
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function getMonthStartTimestamp(timestamp: number): number {
+  const date = new Date(timestamp);
+  return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
+}
+
+function shiftCalendarMonth(monthStartTimestamp: number, deltaMonths: number): number {
+  const date = new Date(monthStartTimestamp);
+  return new Date(date.getFullYear(), date.getMonth() + deltaMonths, 1).getTime();
+}
+
+function buildCalendarCells(monthStartTimestamp: number, workoutDayKeys: Set<string>, todayKey: string): CalendarCell[] {
+  const firstDay = new Date(monthStartTimestamp);
+  const year = firstDay.getFullYear();
+  const monthIndex = firstDay.getMonth();
+  const monthStartsOnWeekday = firstDay.getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, monthIndex, 0).getDate();
+  const visibleCellCount =
+    Math.ceil((monthStartsOnWeekday + daysInMonth) / WEEKDAY_LABELS.length) * WEEKDAY_LABELS.length;
+
+  return Array.from({ length: visibleCellCount }, (_, cellIndex) => {
+    const isLeadingCell = cellIndex < monthStartsOnWeekday;
+    const isTrailingCell = cellIndex >= monthStartsOnWeekday + daysInMonth;
+
+    let dayNumber = 0;
+    let date: Date;
+    let inCurrentMonth = false;
+
+    if (isLeadingCell) {
+      dayNumber = daysInPrevMonth - monthStartsOnWeekday + cellIndex + 1;
+      date = new Date(year, monthIndex - 1, dayNumber);
+    } else if (isTrailingCell) {
+      dayNumber = cellIndex - monthStartsOnWeekday - daysInMonth + 1;
+      date = new Date(year, monthIndex + 1, dayNumber);
+    } else {
+      dayNumber = cellIndex - monthStartsOnWeekday + 1;
+      date = new Date(year, monthIndex, dayNumber);
+      inCurrentMonth = true;
+    }
+
+    const dateKey = toLocalDateKey(date.getTime());
+
+    return {
+      key: `${dateKey}-${cellIndex}`,
+      dayNumber,
+      inCurrentMonth,
+      isWorkoutDay: inCurrentMonth && workoutDayKeys.has(dateKey),
+      isToday: dateKey === todayKey,
+    };
+  });
+}
+
+function toCalendarWeeks(cells: CalendarCell[]): CalendarCell[][] {
+  const weeks: CalendarCell[][] = [];
+
+  for (let index = 0; index < cells.length; index += WEEKDAY_LABELS.length) {
+    weeks.push(cells.slice(index, index + WEEKDAY_LABELS.length));
+  }
+
+  return weeks;
 }
 
 export default function HistoryScreen() {
@@ -49,6 +128,9 @@ export default function HistoryScreen() {
   const [draftBodyweight, setDraftBodyweight] = useState('');
   const [draftSets, setDraftSets] = useState<SessionSetDraft[]>([]);
   const [editError, setEditError] = useState<string | null>(null);
+  const [calendarMonthStartTimestamp, setCalendarMonthStartTimestamp] = useState(() =>
+    getMonthStartTimestamp(Date.now())
+  );
 
   const sessionDateFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
@@ -57,6 +139,25 @@ export default function HistoryScreen() {
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
+    });
+  }, []);
+  const shortLastWorkoutFormatter = useMemo(() => {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  }, []);
+  const fullLastWorkoutFormatter = useMemo(() => {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
     });
   }, []);
 
@@ -76,8 +177,48 @@ export default function HistoryScreen() {
     return flattened.sort((a, b) => b.session.performedAt - a.session.performedAt);
   }, [workouts]);
 
+  const todayKey = useMemo(() => toLocalDateKey(Date.now()), []);
+  const workoutDayKeys = useMemo(() => {
+    const days = new Set<string>();
+
+    sessions.forEach((item) => {
+      days.add(toLocalDateKey(item.session.performedAt));
+    });
+
+    return days;
+  }, [sessions]);
+
+  const calendarMonthLabel = useMemo(() => {
+    return new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date(calendarMonthStartTimestamp));
+  }, [calendarMonthStartTimestamp]);
+
+  const calendarCells = useMemo(
+    () => buildCalendarCells(calendarMonthStartTimestamp, workoutDayKeys, todayKey),
+    [calendarMonthStartTimestamp, todayKey, workoutDayKeys]
+  );
+  const calendarWeeks = useMemo(() => toCalendarWeeks(calendarCells), [calendarCells]);
+
+  const completedDaysInMonth = useMemo(() => {
+    return calendarCells.filter((cell) => cell.inCurrentMonth && cell.isWorkoutDay).length;
+  }, [calendarCells]);
+
   const totalSessions = sessions.length;
   const lastSession = sessions[0] ?? null;
+  const lastWorkoutTimestamp = useMemo(() => {
+    if (!lastSession) {
+      return 'None';
+    }
+
+    const performedAtDate = new Date(lastSession.session.performedAt);
+    const currentYear = new Date().getFullYear();
+    const formatter =
+      performedAtDate.getFullYear() === currentYear ? shortLastWorkoutFormatter : fullLastWorkoutFormatter;
+
+    return formatter.format(performedAtDate);
+  }, [fullLastWorkoutFormatter, lastSession, shortLastWorkoutFormatter]);
 
   const openEditModal = (item: SessionListItem) => {
     setEditingSession(item);
@@ -211,10 +352,8 @@ export default function HistoryScreen() {
               backgroundColor: theme.palette.panel,
             },
           ]}>
-          <AppText variant="display">Past Workouts</AppText>
-          <AppText tone="muted">
-            Review your completed training sessions and edit logged reps, weights, or bodyweight.
-          </AppText>
+          <AppText variant="title">Past Workouts</AppText>
+          <AppText tone="muted">Review completed sessions and update logs.</AppText>
         </View>
 
         <View
@@ -235,10 +374,107 @@ export default function HistoryScreen() {
             <AppText variant="micro" tone="muted">
               Last Workout
             </AppText>
-            <AppText variant="heading">
-              {lastSession ? sessionDateFormatter.format(new Date(lastSession.session.performedAt)) : 'None'}
-            </AppText>
+            <AppText variant="heading">{lastWorkoutTimestamp}</AppText>
           </View>
+        </View>
+
+        <View
+          style={[
+            styles.calendarCard,
+            {
+              borderColor: theme.palette.border,
+              backgroundColor: theme.palette.panel,
+            },
+          ]}>
+          <View style={styles.calendarHeader}>
+            <View style={styles.calendarTitleWrap}>
+              <AppText variant="heading">Consistency Calendar</AppText>
+              <AppText tone="muted">Highlighted days are days you trained.</AppText>
+            </View>
+
+            <View style={styles.calendarMonthRow}>
+              <Pressable
+                onPress={() => {
+                  setCalendarMonthStartTimestamp((current) => shiftCalendarMonth(current, -1));
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.calendarNavButton,
+                  {
+                    borderColor: theme.palette.border,
+                    backgroundColor: theme.palette.panelSoft,
+                    opacity: pressed ? 0.82 : 1,
+                  },
+                ]}>
+                <Ionicons name="chevron-back" size={16} color={theme.palette.textPrimary} />
+              </Pressable>
+              <AppText numberOfLines={1} style={styles.calendarMonthLabel}>
+                {calendarMonthLabel}
+              </AppText>
+              <Pressable
+                onPress={() => {
+                  setCalendarMonthStartTimestamp((current) => shiftCalendarMonth(current, 1));
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.calendarNavButton,
+                  {
+                    borderColor: theme.palette.border,
+                    backgroundColor: theme.palette.panelSoft,
+                    opacity: pressed ? 0.82 : 1,
+                  },
+                ]}>
+                <Ionicons name="chevron-forward" size={16} color={theme.palette.textPrimary} />
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.calendarWeekRow}>
+            {WEEKDAY_LABELS.map((weekday) => (
+              <View key={weekday} style={styles.calendarWeekCell}>
+                <AppText variant="micro" tone="muted" style={styles.calendarWeekLabel}>
+                  {weekday}
+                </AppText>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.calendarGrid}>
+            {calendarWeeks.map((week, weekIndex) => (
+              <View key={`calendar-week-${weekIndex}`} style={styles.calendarGridWeekRow}>
+                {week.map((cell) => (
+                  <View key={cell.key} style={styles.calendarDayCellSlot}>
+                    <View
+                      style={[
+                        styles.calendarDayCell,
+                        {
+                          borderColor: cell.isToday ? theme.palette.accentSecondary : theme.palette.border,
+                          backgroundColor: cell.isWorkoutDay
+                            ? `${theme.palette.accent}30`
+                            : cell.inCurrentMonth
+                              ? theme.palette.panelSoft
+                              : `${theme.palette.background}66`,
+                        },
+                      ]}>
+                      {cell.inCurrentMonth ? (
+                        <View style={styles.calendarDayLabelWrap}>
+                          <AppText
+                            tone={cell.isWorkoutDay ? 'accent' : 'primary'}
+                            style={styles.calendarDayLabel}>
+                            {cell.dayNumber}
+                          </AppText>
+                        </View>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </View>
+
+          <AppText variant="micro" tone="muted">
+            {completedDaysInMonth} training day{completedDaysInMonth === 1 ? '' : 's'} this month.
+          </AppText>
         </View>
 
         {sessions.length === 0 ? (

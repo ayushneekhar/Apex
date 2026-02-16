@@ -1,44 +1,70 @@
-import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert,
+  Linking,
   Modal,
   Platform,
   Pressable,
   ScrollView,
   View,
   type KeyboardTypeOptions,
-} from 'react-native';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  SlideInRight,
+  SlideOutRight,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppText } from '@/components/ui/app-text';
-import { NeonButton } from '@/components/ui/neon-button';
-import { NeonGridBackground } from '@/components/ui/neon-grid-background';
-import { NeonInput } from '@/components/ui/neon-input';
-import { OverloadButton } from '@/components/ui/overload-button';
-import { designTokens } from '@/constants/design-system';
+import { AppText } from "@/components/ui/app-text";
+import { NeonButton } from "@/components/ui/neon-button";
+import { NeonGridBackground } from "@/components/ui/neon-grid-background";
+import { NeonInput } from "@/components/ui/neon-input";
+import { OverloadButton } from "@/components/ui/overload-button";
+import { designTokens } from "@/constants/design-system";
+import { EXERCISE_LIBRARY } from "@/constants/exercise-library";
 import {
   DEFAULT_REST_SECONDS,
   MAX_REST_SECONDS,
   MIN_REST_SECONDS,
   REST_TIMER_STEP_SECONDS,
-} from '@/constants/workout';
-import { EXERCISE_LIBRARY } from '@/constants/exercise-library';
-import { useAppTheme } from '@/hooks/use-app-theme';
-import { triggerSelectionHaptic, triggerSuccessHaptic } from '@/lib/haptics';
-import { createId } from '@/lib/id';
-import { cancelScheduledNotification, scheduleRestCompleteNotification } from '@/lib/rest-notifications';
+} from "@/constants/workout";
+import { useAppTheme } from "@/hooks/use-app-theme";
+import { triggerSelectionHaptic, triggerSuccessHaptic } from "@/lib/haptics";
+import { createId } from "@/lib/id";
+import {
+  cancelScheduledNotification,
+  scheduleRestCompleteNotification,
+} from "@/lib/rest-notifications";
+import {
+  getSpotifyNowPlaying,
+  isSpotifyConfigured,
+  isSpotifyConnected,
+  SpotifyRateLimitError,
+  type SpotifyNowPlaying,
+} from "@/lib/spotify";
 import {
   formatWeightFromKg,
   formatWeightInputFromKg,
   getDefaultWeeklyIncrementKg,
   isAssistedWeightKg,
   parseWeightInputToKg,
-} from '@/lib/weight';
-import { useAppStore } from '@/store/use-app-store';
-import type { ActiveWorkoutSession, ActiveWorkoutSet, NewWorkoutExerciseInput, Workout } from '@/types/workout';
-import { styles } from './WorkoutsScreen.styles';
+} from "@/lib/weight";
+import { useAppStore } from "@/store/use-app-store";
+import type {
+  ActiveWorkoutSession,
+  ActiveWorkoutSet,
+  NewWorkoutExerciseInput,
+  Workout,
+} from "@/types/workout";
+import { styles } from "./WorkoutsScreen.styles";
 
 type ExerciseDraft = {
   id: string;
@@ -65,15 +91,17 @@ type ActiveRestTimer = {
   durationMs: number;
 };
 
+type CustomSetEditMode = "reps" | "weight";
+
 function createExerciseDraft(name: string): ExerciseDraft {
   return {
-    id: createId('draft'),
+    id: createId("draft"),
     name,
-    sets: '3',
-    reps: '10',
+    sets: "3",
+    reps: "10",
     restSeconds: String(DEFAULT_REST_SECONDS),
-    startWeight: '0',
-    overload: '',
+    startWeight: "0",
+    overload: "",
   };
 }
 
@@ -84,19 +112,34 @@ function formatDuration(ms: number): string {
   const seconds = totalSeconds % 60;
 
   if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(seconds).padStart(2, "0")}`;
   }
 
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(
+    2,
+    "0"
+  )}`;
 }
 
 function getElapsedMs(session: ActiveWorkoutSession, now: number): number {
-  const pausedDelta = session.isPaused && session.pauseStartedAt !== null ? now - session.pauseStartedAt : 0;
-  return Math.max(0, now - session.startedAt - session.totalPausedMs - pausedDelta);
+  const pausedDelta =
+    session.isPaused && session.pauseStartedAt !== null
+      ? now - session.pauseStartedAt
+      : 0;
+  return Math.max(
+    0,
+    now - session.startedAt - session.totalPausedMs - pausedDelta
+  );
 }
 
 function estimateWorkoutMinutes(workout: Workout): number {
-  const setCount = workout.exercises.reduce((total, exercise) => total + exercise.sets, 0);
+  const setCount = workout.exercises.reduce(
+    (total, exercise) => total + exercise.sets,
+    0
+  );
   return Math.max(20, Math.round(setCount * 2.3));
 }
 
@@ -134,7 +177,10 @@ function groupActiveSetsByExercise(sets: ActiveWorkoutSet[]): ActiveSetGroup[] {
 }
 
 function clampRestSeconds(seconds: number): number {
-  return Math.min(MAX_REST_SECONDS, Math.max(MIN_REST_SECONDS, Math.floor(seconds)));
+  return Math.min(
+    MAX_REST_SECONDS,
+    Math.max(MIN_REST_SECONDS, Math.floor(seconds))
+  );
 }
 
 function parseRestSecondsInput(value: string): number | null {
@@ -148,7 +194,10 @@ function parseRestSecondsInput(value: string): number | null {
 }
 
 const WEIGHT_KEYBOARD_TYPE: KeyboardTypeOptions =
-  Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric';
+  Platform.OS === "ios" ? "numbers-and-punctuation" : "numeric";
+const SPOTIFY_POLL_INTERVAL_MS = 8000;
+const SPOTIFY_RETRY_INTERVAL_MS = 15000;
+const SESSION_HEADER_COMPACT_AFTER_MS = 3000;
 
 export default function WorkoutsScreen() {
   const theme = useAppTheme();
@@ -168,36 +217,68 @@ export default function WorkoutsScreen() {
   const removeWorkout = useAppStore((state) => state.removeWorkout);
 
   const startWorkoutSession = useAppStore((state) => state.startWorkoutSession);
-  const setActiveWorkoutBodyweight = useAppStore((state) => state.setActiveWorkoutBodyweight);
-  const pauseActiveWorkoutSession = useAppStore((state) => state.pauseActiveWorkoutSession);
-  const resumeActiveWorkoutSession = useAppStore((state) => state.resumeActiveWorkoutSession);
-  const decrementOrCompleteSessionSet = useAppStore((state) => state.decrementOrCompleteSessionSet);
-  const setSessionSetCustomValues = useAppStore((state) => state.setSessionSetCustomValues);
-  const finishActiveWorkoutSession = useAppStore((state) => state.finishActiveWorkoutSession);
-  const discardActiveWorkoutSession = useAppStore((state) => state.discardActiveWorkoutSession);
+  const setActiveWorkoutBodyweight = useAppStore(
+    (state) => state.setActiveWorkoutBodyweight
+  );
+  const pauseActiveWorkoutSession = useAppStore(
+    (state) => state.pauseActiveWorkoutSession
+  );
+  const resumeActiveWorkoutSession = useAppStore(
+    (state) => state.resumeActiveWorkoutSession
+  );
+  const decrementOrCompleteSessionSet = useAppStore(
+    (state) => state.decrementOrCompleteSessionSet
+  );
+  const setSessionSetCustomValues = useAppStore(
+    (state) => state.setSessionSetCustomValues
+  );
+  const finishActiveWorkoutSession = useAppStore(
+    (state) => state.finishActiveWorkoutSession
+  );
+  const discardActiveWorkoutSession = useAppStore(
+    (state) => state.discardActiveWorkoutSession
+  );
 
   const [isComposerOpen, setIsComposerOpen] = useState(false);
-  const [workoutName, setWorkoutName] = useState('');
+  const [workoutName, setWorkoutName] = useState("");
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
-  const [customExerciseName, setCustomExerciseName] = useState('');
+  const [customExerciseName, setCustomExerciseName] = useState("");
   const [exerciseDrafts, setExerciseDrafts] = useState<ExerciseDraft[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
-  const [sessionActionError, setSessionActionError] = useState<string | null>(null);
-  const [bodyweightInput, setBodyweightInput] = useState('');
+  const [sessionActionError, setSessionActionError] = useState<string | null>(
+    null
+  );
+  const [bodyweightInput, setBodyweightInput] = useState("");
   const [bodyweightError, setBodyweightError] = useState<string | null>(null);
 
   const [isSessionScreenOpen, setIsSessionScreenOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
-  const [activeRestTimer, setActiveRestTimer] = useState<ActiveRestTimer | null>(null);
-  const [restNotificationId, setRestNotificationId] = useState<string | null>(null);
+  const [activeRestTimer, setActiveRestTimer] =
+    useState<ActiveRestTimer | null>(null);
+  const [restNotificationId, setRestNotificationId] = useState<string | null>(
+    null
+  );
   const restScheduleTokenRef = useRef(0);
+  const didLongPressSetBoxRef = useRef(false);
 
   const [customSetId, setCustomSetId] = useState<string | null>(null);
-  const [customSetRepsInput, setCustomSetRepsInput] = useState('');
-  const [customSetWeightInput, setCustomSetWeightInput] = useState('');
+  const [customSetEditMode, setCustomSetEditMode] =
+    useState<CustomSetEditMode>("reps");
+  const [customSetRepsInput, setCustomSetRepsInput] = useState("");
+  const [customSetWeightInput, setCustomSetWeightInput] = useState("");
   const [customSetError, setCustomSetError] = useState<string | null>(null);
+  const [isDiscardSessionModalOpen, setIsDiscardSessionModalOpen] =
+    useState(false);
+  const [spotifyConnected, setSpotifyConnected] = useState(false);
+  const [spotifyNowPlaying, setSpotifyNowPlaying] =
+    useState<SpotifyNowPlaying | null>(null);
+  const [spotifyProgressSyncedAtMs, setSpotifyProgressSyncedAtMs] = useState<
+    number | null
+  >(null);
   const activeWorkoutId = activeSession?.workoutId ?? null;
   const activeBodyweightKg = activeSession?.bodyweightKg ?? null;
+  const spotifyConfigured = isSpotifyConfigured();
+  const sessionHeaderCompactProgress = useSharedValue(0);
 
   const selectedExercises = useMemo(() => {
     return new Set(exerciseDrafts.map((draft) => draft.name.toLowerCase()));
@@ -205,9 +286,9 @@ export default function WorkoutsScreen() {
 
   const sessionDateFormatter = useMemo(() => {
     return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
+      month: "short",
+      day: "numeric",
+      year: "numeric",
     });
   }, []);
 
@@ -217,22 +298,26 @@ export default function WorkoutsScreen() {
   );
 
   const completedSetCount = useMemo(
-    () => activeSession?.sets.filter((setEntry) => setEntry.actualReps > 0).length ?? 0,
-    [activeSession?.sets]
-  );
-
-  const totalSessionReps = useMemo(
-    () => activeSession?.sets.reduce((total, setEntry) => total + setEntry.actualReps, 0) ?? 0,
+    () =>
+      activeSession?.sets.filter((setEntry) => setEntry.actualReps > 0)
+        .length ?? 0,
     [activeSession?.sets]
   );
 
   const totalSessionVolumeKg = useMemo(
     () =>
       activeSession?.sets.reduce(
-        (total, setEntry) => total + Math.abs(setEntry.actualWeightKg) * setEntry.actualReps,
+        (total, setEntry) =>
+          total + Math.abs(setEntry.actualWeightKg) * setEntry.actualReps,
         0
       ) ?? 0,
     [activeSession?.sets]
+  );
+  const customSetEntry = useMemo(
+    () =>
+      activeSession?.sets.find((setEntry) => setEntry.id === customSetId) ??
+      null,
+    [activeSession?.sets, customSetId]
   );
 
   const sessionElapsed = useMemo(() => {
@@ -242,6 +327,32 @@ export default function WorkoutsScreen() {
 
     return getElapsedMs(activeSession, now);
   }, [activeSession, now]);
+  const shouldCompactSessionHeader =
+    sessionElapsed >= SESSION_HEADER_COMPACT_AFTER_MS;
+
+  const sessionHeaderAnimatedStyle = useAnimatedStyle(() => {
+    const compactProgress = sessionHeaderCompactProgress.value;
+
+    return {
+      paddingTop: spacing.lg + (spacing.sm - spacing.lg) * compactProgress,
+      paddingBottom: spacing.lg + (spacing.sm - spacing.lg) * compactProgress,
+    };
+  });
+
+  const sessionHeaderDetailsAnimatedStyle = useAnimatedStyle(() => {
+    const compactProgress = sessionHeaderCompactProgress.value;
+
+    return {
+      opacity: 1 - compactProgress,
+      maxHeight: 120 * (1 - compactProgress),
+      marginTop: spacing.md * (1 - compactProgress),
+      transform: [
+        {
+          translateY: -8 * compactProgress,
+        },
+      ],
+    };
+  });
 
   const restRemainingMs = useMemo(() => {
     if (!activeRestTimer) {
@@ -256,7 +367,14 @@ export default function WorkoutsScreen() {
       return 0;
     }
 
-    return Math.min(1, Math.max(0, (activeRestTimer.durationMs - restRemainingMs) / activeRestTimer.durationMs));
+    return Math.min(
+      1,
+      Math.max(
+        0,
+        (activeRestTimer.durationMs - restRemainingMs) /
+          activeRestTimer.durationMs
+      )
+    );
   }, [activeRestTimer, restRemainingMs]);
 
   const restIsComplete = activeRestTimer !== null && restRemainingMs === 0;
@@ -281,6 +399,7 @@ export default function WorkoutsScreen() {
     if (!activeSession) {
       setIsSessionScreenOpen(false);
       closeCustomRepsModal();
+      setIsDiscardSessionModalOpen(false);
     }
   }, [activeSession]);
 
@@ -298,6 +417,87 @@ export default function WorkoutsScreen() {
   }, [activeSession, restNotificationId]);
 
   useEffect(() => {
+    if (!isSessionScreenOpen || !activeWorkoutId) {
+      setSpotifyConnected(false);
+      setSpotifyNowPlaying(null);
+      setSpotifyProgressSyncedAtMs(null);
+      return;
+    }
+
+    if (!spotifyConfigured) {
+      setSpotifyConnected(false);
+      setSpotifyNowPlaying(null);
+      setSpotifyProgressSyncedAtMs(null);
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNextPoll = (delayMs: number) => {
+      timeoutId = setTimeout(() => {
+        void pollSpotify();
+      }, delayMs);
+    };
+
+    const pollSpotify = async () => {
+      try {
+        const connected = await isSpotifyConnected();
+
+        if (cancelled) {
+          return;
+        }
+
+        setSpotifyConnected(connected);
+
+        if (!connected) {
+          setSpotifyNowPlaying(null);
+          setSpotifyProgressSyncedAtMs(null);
+          scheduleNextPoll(SPOTIFY_RETRY_INTERVAL_MS);
+          return;
+        }
+
+        const playback = await getSpotifyNowPlaying();
+
+        if (cancelled) {
+          return;
+        }
+
+        setSpotifyNowPlaying(playback);
+        setSpotifyProgressSyncedAtMs(playback ? Date.now() : null);
+        scheduleNextPoll(SPOTIFY_POLL_INTERVAL_MS);
+      } catch (spotifyError) {
+        if (cancelled) {
+          return;
+        }
+
+        if (spotifyError instanceof SpotifyRateLimitError) {
+          setSpotifyNowPlaying(null);
+          setSpotifyProgressSyncedAtMs(null);
+          scheduleNextPoll(
+            Math.max(spotifyError.retryAfterMs, SPOTIFY_RETRY_INTERVAL_MS)
+          );
+          return;
+        }
+
+        setSpotifyNowPlaying(null);
+        setSpotifyProgressSyncedAtMs(null);
+        scheduleNextPoll(SPOTIFY_RETRY_INTERVAL_MS);
+      }
+    };
+
+    void pollSpotify();
+
+    return () => {
+      cancelled = true;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [activeWorkoutId, isSessionScreenOpen, spotifyConfigured]);
+
+  useEffect(() => {
     if (!activeRestTimer || restRemainingMs > 0 || !restNotificationId) {
       return;
     }
@@ -307,25 +507,37 @@ export default function WorkoutsScreen() {
   }, [activeRestTimer, restRemainingMs, restNotificationId]);
 
   useEffect(() => {
+    sessionHeaderCompactProgress.value = withTiming(
+      shouldCompactSessionHeader ? 1 : 0,
+      {
+        duration: 340,
+        easing: Easing.linear,
+      }
+    );
+  }, [sessionHeaderCompactProgress, shouldCompactSessionHeader]);
+
+  useEffect(() => {
     if (!activeWorkoutId) {
-      setBodyweightInput('');
+      setBodyweightInput("");
       setBodyweightError(null);
       return;
     }
 
     if (activeBodyweightKg === null) {
-      setBodyweightInput('');
+      setBodyweightInput("");
       return;
     }
 
-    setBodyweightInput(formatWeightInputFromKg(activeBodyweightKg, settings.weightUnit));
+    setBodyweightInput(
+      formatWeightInputFromKg(activeBodyweightKg, settings.weightUnit)
+    );
   }, [activeBodyweightKg, activeWorkoutId, settings.weightUnit]);
 
   const openComposer = () => {
     setIsComposerOpen(true);
-    setWorkoutName('');
+    setWorkoutName("");
     setEditingWorkoutId(null);
-    setCustomExerciseName('');
+    setCustomExerciseName("");
     setExerciseDrafts([]);
     setFormError(null);
     clearError();
@@ -338,16 +550,22 @@ export default function WorkoutsScreen() {
       [...workout.exercises]
         .sort((a, b) => a.sortOrder - b.sortOrder)
         .map((exercise) => ({
-          id: createId('draft'),
+          id: createId("draft"),
           name: exercise.name,
           sets: String(exercise.sets),
           reps: String(exercise.reps),
           restSeconds: String(exercise.restSeconds),
-          startWeight: formatWeightInputFromKg(exercise.startWeightKg, settings.weightUnit),
-          overload: formatWeightInputFromKg(exercise.overloadIncrementKg, settings.weightUnit),
+          startWeight: formatWeightInputFromKg(
+            exercise.startWeightKg,
+            settings.weightUnit
+          ),
+          overload: formatWeightInputFromKg(
+            exercise.overloadIncrementKg,
+            settings.weightUnit
+          ),
         }))
     );
-    setCustomExerciseName('');
+    setCustomExerciseName("");
     setIsComposerOpen(true);
     setFormError(null);
     clearError();
@@ -355,9 +573,9 @@ export default function WorkoutsScreen() {
 
   const closeComposer = () => {
     setIsComposerOpen(false);
-    setWorkoutName('');
+    setWorkoutName("");
     setEditingWorkoutId(null);
-    setCustomExerciseName('');
+    setCustomExerciseName("");
     setExerciseDrafts([]);
     setFormError(null);
   };
@@ -369,7 +587,11 @@ export default function WorkoutsScreen() {
     }
 
     setExerciseDrafts((current) => {
-      if (current.some((item) => item.name.toLowerCase() === normalized.toLowerCase())) {
+      if (
+        current.some(
+          (item) => item.name.toLowerCase() === normalized.toLowerCase()
+        )
+      ) {
         return current;
       }
 
@@ -379,7 +601,7 @@ export default function WorkoutsScreen() {
 
   const addCustomExercise = () => {
     addExerciseToDraft(customExerciseName);
-    setCustomExerciseName('');
+    setCustomExerciseName("");
   };
 
   const removeExerciseDraft = (id: string) => {
@@ -409,7 +631,8 @@ export default function WorkoutsScreen() {
         }
 
         const parsed = parseRestSecondsInput(item.restSeconds);
-        const baseline = parsed === null ? DEFAULT_REST_SECONDS : clampRestSeconds(parsed);
+        const baseline =
+          parsed === null ? DEFAULT_REST_SECONDS : clampRestSeconds(parsed);
         const nextRestSeconds = clampRestSeconds(baseline + delta);
 
         return {
@@ -424,12 +647,12 @@ export default function WorkoutsScreen() {
     const trimmedWorkoutName = workoutName.trim();
 
     if (!trimmedWorkoutName) {
-      setFormError('Give this workout a name before saving.');
+      setFormError("Give this workout a name before saving.");
       return;
     }
 
     if (exerciseDrafts.length === 0) {
-      setFormError('Add at least one exercise.');
+      setFormError("Add at least one exercise.");
       return;
     }
 
@@ -439,7 +662,10 @@ export default function WorkoutsScreen() {
       const sets = Number.parseInt(draft.sets, 10);
       const reps = Number.parseInt(draft.reps, 10);
       const restSecondsInput = parseRestSecondsInput(draft.restSeconds);
-      const startWeightKg = parseWeightInputToKg(draft.startWeight, settings.weightUnit);
+      const startWeightKg = parseWeightInputToKg(
+        draft.startWeight,
+        settings.weightUnit
+      );
 
       if (!Number.isFinite(sets) || sets < 1) {
         setFormError(`Sets for ${draft.name} must be 1 or greater.`);
@@ -473,7 +699,9 @@ export default function WorkoutsScreen() {
         : getDefaultWeeklyIncrementKg(settings.weightUnit);
 
       if (overloadKg === null || overloadKg <= 0) {
-        setFormError(`Progressive overload for ${draft.name} must be above zero.`);
+        setFormError(
+          `Progressive overload for ${draft.name} must be above zero.`
+        );
         return;
       }
 
@@ -503,7 +731,7 @@ export default function WorkoutsScreen() {
       }
       closeComposer();
     } catch {
-      setFormError('Could not save this workout template. Try again.');
+      setFormError("Could not save this workout template. Try again.");
     }
   };
 
@@ -514,14 +742,14 @@ export default function WorkoutsScreen() {
         await setActiveWorkoutBodyweight(null);
         setBodyweightError(null);
       } catch {
-        setBodyweightError('Could not clear bodyweight right now.');
+        setBodyweightError("Could not clear bodyweight right now.");
       }
       return;
     }
 
     const parsed = parseWeightInputToKg(trimmed, settings.weightUnit);
     if (parsed === null || parsed <= 0) {
-      setBodyweightError('Enter a valid bodyweight above zero.');
+      setBodyweightError("Enter a valid bodyweight above zero.");
       return;
     }
 
@@ -529,8 +757,14 @@ export default function WorkoutsScreen() {
       await setActiveWorkoutBodyweight(parsed);
       setBodyweightError(null);
     } catch {
-      setBodyweightError('Could not save bodyweight right now.');
+      setBodyweightError("Could not save bodyweight right now.");
     }
+  };
+
+  const openSpotifyTrack = async (trackUrl: string) => {
+    try {
+      await Linking.openURL(trackUrl);
+    } catch {}
   };
 
   const beginWorkout = async (workoutId: string) => {
@@ -539,7 +773,9 @@ export default function WorkoutsScreen() {
     clearError();
 
     if (activeSession && activeSession.workoutId !== workoutId) {
-      setSessionActionError('Finish or discard your active workout session before starting another.');
+      setSessionActionError(
+        "Finish or discard your active workout session before starting another."
+      );
       return;
     }
 
@@ -550,48 +786,70 @@ export default function WorkoutsScreen() {
 
       setIsSessionScreenOpen(true);
     } catch {
-      setSessionActionError('Could not start this workout right now. Try again.');
+      setSessionActionError(
+        "Could not start this workout right now. Try again."
+      );
     }
   };
 
-  const openCustomSetModal = (setEntry: ActiveWorkoutSet) => {
+  const openCustomSetModal = (
+    setEntry: ActiveWorkoutSet,
+    mode: CustomSetEditMode
+  ) => {
     setCustomSetId(setEntry.id);
+    setCustomSetEditMode(mode);
     setCustomSetRepsInput(String(setEntry.actualReps));
-    setCustomSetWeightInput(formatWeightInputFromKg(setEntry.actualWeightKg, settings.weightUnit));
+    setCustomSetWeightInput(
+      formatWeightInputFromKg(setEntry.actualWeightKg, settings.weightUnit)
+    );
     setCustomSetError(null);
   };
 
   function closeCustomRepsModal() {
     setCustomSetId(null);
-    setCustomSetRepsInput('');
-    setCustomSetWeightInput('');
+    setCustomSetEditMode("reps");
+    setCustomSetRepsInput("");
+    setCustomSetWeightInput("");
     setCustomSetError(null);
   }
 
   const saveCustomSetValues = async () => {
-    if (!customSetId) {
+    if (!customSetId || !customSetEntry) {
       return;
     }
 
-    const parsedReps = Number.parseInt(customSetRepsInput.trim(), 10);
-    const parsedWeightKg = parseWeightInputToKg(customSetWeightInput.trim(), settings.weightUnit);
+    let nextReps = customSetEntry.actualReps;
+    let nextWeightKg = customSetEntry.actualWeightKg;
 
-    if (!Number.isFinite(parsedReps) || parsedReps < 0) {
-      setCustomSetError('Reps must be zero or above.');
-      return;
-    }
+    if (customSetEditMode === "reps") {
+      const parsedReps = Number.parseInt(customSetRepsInput.trim(), 10);
 
-    if (parsedWeightKg === null) {
-      setCustomSetError('Weight is invalid. Use a valid number.');
-      return;
+      if (!Number.isFinite(parsedReps) || parsedReps < 0) {
+        setCustomSetError("Reps must be zero or above.");
+        return;
+      }
+
+      nextReps = parsedReps;
+    } else {
+      const parsedWeightKg = parseWeightInputToKg(
+        customSetWeightInput.trim(),
+        settings.weightUnit
+      );
+
+      if (parsedWeightKg === null) {
+        setCustomSetError("Weight is invalid. Use a valid number.");
+        return;
+      }
+
+      nextWeightKg = parsedWeightKg;
     }
 
     try {
-      await setSessionSetCustomValues(customSetId, parsedReps, parsedWeightKg);
+      await setSessionSetCustomValues(customSetId, nextReps, nextWeightKg);
       triggerSuccessHaptic();
       closeCustomRepsModal();
     } catch {
-      setCustomSetError('Could not save set values. Try again.');
+      setCustomSetError("Could not save set values. Try again.");
     }
   };
 
@@ -629,7 +887,10 @@ export default function WorkoutsScreen() {
       await cancelScheduledNotification(notificationToCancel);
     }
 
-    const nextNotificationId = await scheduleRestCompleteNotification(restSeconds, setEntry.exerciseName);
+    const nextNotificationId = await scheduleRestCompleteNotification(
+      restSeconds,
+      setEntry.exerciseName
+    );
 
     if (restScheduleTokenRef.current !== nextToken) {
       await cancelScheduledNotification(nextNotificationId);
@@ -660,37 +921,38 @@ export default function WorkoutsScreen() {
         await clearRestTimer();
       }
     } catch {
-      setSessionActionError('Could not update this set right now.');
+      setSessionActionError("Could not update this set right now.");
     }
   };
 
   const handleSetWeightPress = (setEntry: ActiveWorkoutSet) => {
     triggerSelectionHaptic();
-    openCustomSetModal(setEntry);
+    openCustomSetModal(setEntry, "weight");
   };
 
-  const handleDiscardSession = () => {
-    Alert.alert('Discard workout?', 'This active session will be removed and cannot be recovered.', [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Discard',
-        style: 'destructive',
-        onPress: () => {
-          void (async () => {
-            try {
-              await clearRestTimer();
-              await discardActiveWorkoutSession();
-              setIsSessionScreenOpen(false);
-            } catch {
-              setSessionActionError('Could not discard the current session.');
-            }
-          })();
-        },
-      },
-    ]);
+  const handleSetLongPress = (setEntry: ActiveWorkoutSet) => {
+    triggerSelectionHaptic();
+    openCustomSetModal(setEntry, "reps");
+  };
+
+  const openDiscardSessionModal = () => {
+    setSessionActionError(null);
+    setIsDiscardSessionModalOpen(true);
+  };
+
+  const closeDiscardSessionModal = () => {
+    setIsDiscardSessionModalOpen(false);
+  };
+
+  const handleDiscardSession = async () => {
+    try {
+      await clearRestTimer();
+      await discardActiveWorkoutSession();
+      setIsSessionScreenOpen(false);
+      setIsDiscardSessionModalOpen(false);
+    } catch {
+      setSessionActionError("Could not discard the current session.");
+    }
   };
 
   const handleFinishSession = async () => {
@@ -699,25 +961,117 @@ export default function WorkoutsScreen() {
       await finishActiveWorkoutSession();
       setIsSessionScreenOpen(false);
     } catch {
-      setSessionActionError('Could not save this workout session.');
+      setSessionActionError("Could not save this workout session.");
     }
   };
 
   const compactHero = workouts.length > 0 && !isComposerOpen;
+  const moveTrackerCardToBottom = workouts.length > 1;
   const defaultOverload = formatWeightFromKg(
     getDefaultWeeklyIncrementKg(settings.weightUnit),
     settings.weightUnit
   );
+  const spotifyLiveProgressMs = useMemo(() => {
+    if (!spotifyNowPlaying) {
+      return 0;
+    }
 
-  if (isSessionScreenOpen && activeSession) {
-    return (
-      <View
+    const baseProgressMs = Math.max(0, spotifyNowPlaying.progressMs);
+
+    if (!spotifyNowPlaying.isPlaying || spotifyProgressSyncedAtMs === null) {
+      if (spotifyNowPlaying.durationMs > 0) {
+        return Math.min(baseProgressMs, spotifyNowPlaying.durationMs);
+      }
+
+      return baseProgressMs;
+    }
+
+    const elapsedSinceSyncMs = Math.max(0, now - spotifyProgressSyncedAtMs);
+    const progressedMs = baseProgressMs + elapsedSinceSyncMs;
+
+    if (spotifyNowPlaying.durationMs > 0) {
+      return Math.min(progressedMs, spotifyNowPlaying.durationMs);
+    }
+
+    return progressedMs;
+  }, [now, spotifyNowPlaying, spotifyProgressSyncedAtMs]);
+
+  const spotifyProgressLabel =
+    spotifyNowPlaying && spotifyNowPlaying.durationMs > 0
+      ? `${formatDuration(spotifyLiveProgressMs)} / ${formatDuration(
+          spotifyNowPlaying.durationMs
+        )}`
+      : null;
+  const showSpotifyCard = spotifyConnected && spotifyNowPlaying !== null;
+  const renderTrackerCard = () => (
+    <View
+      style={[
+        compactHero ? styles.heroCompact : styles.heroCard,
+        {
+          borderColor: theme.palette.border,
+          backgroundColor: theme.palette.panel,
+        },
+      ]}
+    >
+      {compactHero ? (
+        <>
+          <View style={styles.compactHeroTextWrap}>
+            <AppText variant="label" tone="accent">
+              WORKOUT TRACKER
+            </AppText>
+            <AppText variant="heading">Workouts ready</AppText>
+          </View>
+          {!isComposerOpen ? (
+            <NeonButton
+              title="Add workout"
+              variant="ghost"
+              onPress={openComposer}
+            />
+          ) : (
+            <NeonButton
+              title="Close builder"
+              variant="ghost"
+              onPress={closeComposer}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          <AppText variant="micro" tone="accent">
+            WORKOUT TRACKER
+          </AppText>
+          <AppText variant="display">Plan. Lift. Progress.</AppText>
+          <AppText tone="muted">
+            Create workouts, then start a focused session with live timer and
+            set tracking. Default overload is {defaultOverload}.
+          </AppText>
+
+          {!isComposerOpen ? (
+            <NeonButton title="Add workout" onPress={openComposer} />
+          ) : (
+            <NeonButton
+              title="Close builder"
+              variant="ghost"
+              onPress={closeComposer}
+            />
+          )}
+        </>
+      )}
+    </View>
+  );
+
+  const sessionScreen =
+    isSessionScreenOpen && activeSession ? (
+      <Animated.View
+        entering={SlideInRight.duration(280).easing(Easing.out(Easing.cubic))}
+        exiting={SlideOutRight.duration(220).easing(Easing.in(Easing.cubic))}
         style={[
-          styles.screen,
+          styles.sessionScreenOverlay,
           {
             backgroundColor: theme.palette.background,
           },
-        ]}>
+        ]}
+      >
         <NeonGridBackground />
 
         <ScrollView
@@ -728,32 +1082,51 @@ export default function WorkoutsScreen() {
             styles.content,
             {
               paddingTop: insets.top + layout.screenTopInset,
-              paddingBottom: insets.bottom + sizes.iconLarge,
+              paddingBottom: insets.bottom + layout.screenBottomInset,
             },
           ]}
-          showsVerticalScrollIndicator={false}>
-          <View
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View
             style={[
               styles.sessionHeader,
               {
                 borderColor: theme.palette.border,
                 backgroundColor: theme.palette.panel,
               },
-            ]}>
+              sessionHeaderAnimatedStyle,
+            ]}
+          >
             <Pressable
               onPress={() => {
                 setIsSessionScreenOpen(false);
               }}
-              style={({ pressed }) => [styles.backButton, { opacity: pressed ? opacity.pressedSoft : 1 }]}>
-              <Ionicons name="chevron-back" size={sizes.iconSmall} color={theme.palette.textPrimary} />
+              style={({ pressed }) => [
+                styles.backButton,
+                { opacity: pressed ? opacity.pressedSoft : 1 },
+              ]}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={sizes.iconSmall}
+                color={theme.palette.textPrimary}
+              />
               <AppText variant="label">Workouts</AppText>
             </Pressable>
-
-            <AppText variant="heading">{activeSession.workoutName}</AppText>
-            <AppText tone="muted">
-              Tap top of a set to mark complete or decrement reps. Tap bottom strip to edit weight.
-            </AppText>
-          </View>
+            <Animated.View
+              pointerEvents={shouldCompactSessionHeader ? "none" : "auto"}
+              style={[
+                styles.sessionHeaderDetails,
+                sessionHeaderDetailsAnimatedStyle,
+              ]}
+            >
+              <AppText variant="heading">{activeSession.workoutName}</AppText>
+              <AppText tone="muted">
+                Tap top of a set to mark complete or decrement reps. Press and
+                hold the set to edit reps. Tap bottom strip to edit weight.
+              </AppText>
+            </Animated.View>
+          </Animated.View>
 
           <View
             style={[
@@ -762,27 +1135,139 @@ export default function WorkoutsScreen() {
                 borderColor: theme.palette.border,
                 backgroundColor: theme.palette.panel,
               },
-            ]}>
+            ]}
+          >
             <AppText variant="micro" tone="muted">
               Session Time
             </AppText>
-            <AppText variant="display">{formatDuration(sessionElapsed)}</AppText>
+            <View style={styles.timerValueRow}>
+              <AppText variant="display">{formatDuration(sessionElapsed)}</AppText>
+              <Pressable
+                onPress={() => {
+                  if (activeSession.isPaused) {
+                    void resumeActiveWorkoutSession();
+                    return;
+                  }
+
+                  void pauseActiveWorkoutSession();
+                }}
+                style={({ pressed }) => [
+                  styles.timerControlButton,
+                  {
+                    borderColor: activeSession.isPaused
+                      ? theme.palette.accent
+                      : theme.palette.border,
+                    backgroundColor: activeSession.isPaused
+                      ? `${theme.palette.accent}24`
+                      : theme.palette.panelSoft,
+                    opacity: pressed ? opacity.pressedSoft : 1,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={activeSession.isPaused ? "play" : "pause"}
+                  size={sizes.iconLarge}
+                  color={
+                    activeSession.isPaused
+                      ? theme.palette.accent
+                      : theme.palette.textPrimary
+                  }
+                />
+              </Pressable>
+            </View>
+
+            {showSpotifyCard ? (
+              <Animated.View
+                entering={FadeIn.duration(220).easing(Easing.linear)}
+                exiting={FadeOut.duration(160).easing(Easing.linear)}
+              >
+                <Pressable
+                  onPress={() => {
+                    const trackUrl = spotifyNowPlaying?.trackUrl;
+
+                    if (!trackUrl) {
+                      return;
+                    }
+
+                    void openSpotifyTrack(trackUrl);
+                  }}
+                  style={({ pressed }) => [
+                    styles.spotifyCard,
+                    {
+                      borderColor: theme.palette.accent,
+                      backgroundColor: theme.palette.panelSoft,
+                      opacity: pressed ? opacity.pressedSoft : 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.spotifyTrackRow}>
+                    {spotifyNowPlaying.albumArtUrl ? (
+                      <Image
+                        source={{ uri: spotifyNowPlaying.albumArtUrl }}
+                        contentFit="cover"
+                        style={styles.spotifyArtwork}
+                      />
+                    ) : (
+                      <View
+                        style={[
+                          styles.spotifyArtworkFallback,
+                          {
+                            borderColor: theme.palette.border,
+                            backgroundColor: theme.palette.background,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name="musical-notes"
+                          size={sizes.iconSmall}
+                          color={theme.palette.textMuted}
+                        />
+                      </View>
+                    )}
+                    <View style={styles.spotifyTrackText}>
+                      <AppText variant="label">{spotifyNowPlaying.songName}</AppText>
+                      <AppText variant="micro" tone="muted">
+                        {spotifyNowPlaying.artistNames}
+                      </AppText>
+                      <AppText variant="micro" tone="muted">
+                        {spotifyNowPlaying.albumName}
+                      </AppText>
+                      {spotifyProgressLabel ? (
+                        <AppText
+                          variant="micro"
+                          tone={spotifyNowPlaying.isPlaying ? "accent" : "muted"}
+                        >
+                          {spotifyNowPlaying.isPlaying ? "Playing" : "Paused"} •{" "}
+                          {spotifyProgressLabel}
+                        </AppText>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
+              </Animated.View>
+            ) : null}
 
             {activeRestTimer ? (
               <View
                 style={[
                   styles.restTimerCard,
                   {
-                    borderColor: restIsComplete ? theme.palette.success : theme.palette.accent,
+                    borderColor: restIsComplete
+                      ? theme.palette.success
+                      : theme.palette.accent,
                     backgroundColor: theme.palette.panelSoft,
                   },
-                ]}>
+                ]}
+              >
                 <View style={styles.restTimerHeaderRow}>
                   <AppText variant="micro" tone="muted">
                     Rest Timer
                   </AppText>
-                  <AppText variant="label" tone={restIsComplete ? 'success' : 'accent'}>
-                    {restIsComplete ? 'Ready' : formatDuration(restRemainingMs)}
+                  <AppText
+                    variant="label"
+                    tone={restIsComplete ? "success" : "accent"}
+                  >
+                    {restIsComplete ? "Ready" : formatDuration(restRemainingMs)}
                   </AppText>
                 </View>
                 <AppText tone="muted">
@@ -796,12 +1281,15 @@ export default function WorkoutsScreen() {
                     {
                       borderColor: theme.palette.border,
                     },
-                  ]}>
+                  ]}
+                >
                   <View
                     style={[
                       styles.restProgressFill,
                       {
-                        backgroundColor: restIsComplete ? theme.palette.success : theme.palette.accent,
+                        backgroundColor: restIsComplete
+                          ? theme.palette.success
+                          : theme.palette.accent,
                         width: `${Math.round(restProgress * 100)}%`,
                       },
                     ]}
@@ -812,39 +1300,39 @@ export default function WorkoutsScreen() {
 
             <View style={styles.sessionStatsRow}>
               <View style={styles.sessionStatCell}>
-                <AppText variant="micro" tone="muted" style={styles.sessionStatLabel}>
+                <AppText
+                  variant="micro"
+                  tone="muted"
+                  style={styles.sessionStatLabel}
+                >
                   Completed
                 </AppText>
                 <AppText variant="heading">{completedSetCount}</AppText>
               </View>
               <View style={styles.sessionStatCell}>
-                <AppText variant="micro" tone="muted" style={styles.sessionStatLabel}>
-                  Total Reps
+                <AppText
+                  variant="micro"
+                  tone="muted"
+                  style={styles.sessionStatLabel}
+                >
+                  Total Lifted
                 </AppText>
-                <AppText variant="heading">{totalSessionReps}</AppText>
+                <AppText variant="heading">
+                  {formatWeightFromKg(totalSessionVolumeKg, settings.weightUnit)}
+                </AppText>
               </View>
               <View style={styles.sessionStatCell}>
-                <AppText variant="micro" tone="muted" style={styles.sessionStatLabel}>
+                <AppText
+                  variant="micro"
+                  tone="muted"
+                  style={styles.sessionStatLabel}
+                >
                   Remaining
                 </AppText>
-                <AppText variant="heading">{Math.max(0, activeSession.sets.length - completedSetCount)}</AppText>
+                <AppText variant="heading">
+                  {Math.max(0, activeSession.sets.length - completedSetCount)}
+                </AppText>
               </View>
-            </View>
-
-            <View
-              style={[
-                styles.sessionVolumeRow,
-                {
-                  borderColor: theme.palette.border,
-                  backgroundColor: theme.palette.panelSoft,
-                },
-              ]}>
-              <AppText variant="micro" tone="muted">
-                Total Lifted
-              </AppText>
-              <AppText variant="heading" tone="accent">
-                {formatWeightFromKg(totalSessionVolumeKg, settings.weightUnit)}
-              </AppText>
             </View>
 
             <View style={styles.bodyweightRow}>
@@ -863,7 +1351,11 @@ export default function WorkoutsScreen() {
                 />
               </View>
               <View style={styles.bodyweightButtonCell}>
-                <NeonButton title="Save" variant="ghost" onPress={() => void saveSessionBodyweight()} />
+                <NeonButton
+                  title="Save"
+                  variant="ghost"
+                  onPress={() => void saveSessionBodyweight()}
+                />
               </View>
             </View>
 
@@ -874,7 +1366,8 @@ export default function WorkoutsScreen() {
                   {
                     borderColor: theme.palette.danger,
                   },
-                ]}>
+                ]}
+              >
                 <AppText tone="danger">{bodyweightError}</AppText>
               </View>
             ) : null}
@@ -886,40 +1379,14 @@ export default function WorkoutsScreen() {
                   {
                     borderColor: theme.palette.accent,
                   },
-                ]}>
+                ]}
+              >
                 <AppText tone="accent">
-                  Session was paused after app relaunch. Tap Resume to continue the timer.
+                  Session was paused after app relaunch. Tap Resume to continue
+                  the timer.
                 </AppText>
               </View>
             ) : null}
-          </View>
-
-          <View style={styles.sessionActionRow}>
-            <View style={styles.sessionActionCell}>
-              {activeSession.isPaused ? (
-                <NeonButton
-                  title="Resume"
-                  onPress={() => {
-                    void resumeActiveWorkoutSession();
-                  }}
-                />
-              ) : (
-                <NeonButton
-                  title="Pause"
-                  variant="ghost"
-                  onPress={() => {
-                    void pauseActiveWorkoutSession();
-                  }}
-                />
-              )}
-            </View>
-            <View style={styles.sessionActionCell}>
-              <NeonButton title="Finish & Save" onPress={() => void handleFinishSession()} disabled={mutating} />
-            </View>
-          </View>
-
-          <View>
-            <NeonButton title="Discard Session" variant="danger" onPress={handleDiscardSession} disabled={mutating} />
           </View>
 
           {groupedActiveSets.map((group) => {
@@ -934,18 +1401,27 @@ export default function WorkoutsScreen() {
                     borderColor: theme.palette.border,
                     backgroundColor: theme.palette.panel,
                   },
-                ]}>
+                ]}
+              >
                 <View style={styles.sessionExerciseHeader}>
                   <View style={styles.sessionExerciseNameRow}>
                     <AppText variant="heading">{group.exerciseName}</AppText>
                     {groupIsAssisted ? (
-                      <Ionicons name="arrow-down-circle" size={16} color={theme.palette.accentSecondary} />
+                      <Ionicons
+                        name="arrow-down-circle"
+                        size={16}
+                        color={theme.palette.accentSecondary}
+                      />
                     ) : null}
                   </View>
                   <AppText variant="micro" tone="muted">
-                    Target {formatWeightFromKg(Math.abs(group.targetWeightKg), settings.weightUnit)}
-                    {groupIsAssisted ? ' assisted' : ''}
-                    {' • '}
+                    Target{" "}
+                    {formatWeightFromKg(
+                      Math.abs(group.targetWeightKg),
+                      settings.weightUnit
+                    )}
+                    {groupIsAssisted ? " assisted" : ""}
+                    {" • "}
                     Rest {formatDuration(group.restSeconds * 1000)}
                   </AppText>
                 </View>
@@ -953,8 +1429,13 @@ export default function WorkoutsScreen() {
                 <View style={styles.setBoxGrid}>
                   {group.sets.map((setEntry) => {
                     const completed = setEntry.actualReps > 0;
-                    const setWeight = formatWeightFromKg(Math.abs(setEntry.actualWeightKg), settings.weightUnit);
-                    const setIsAssisted = isAssistedWeightKg(setEntry.actualWeightKg);
+                    const setWeight = formatWeightFromKg(
+                      Math.abs(setEntry.actualWeightKg),
+                      settings.weightUnit
+                    );
+                    const setIsAssisted = isAssistedWeightKg(
+                      setEntry.actualWeightKg
+                    );
 
                     return (
                       <View
@@ -962,22 +1443,45 @@ export default function WorkoutsScreen() {
                         style={[
                           styles.setBox,
                           {
-                            borderColor: completed ? theme.palette.accent : theme.palette.border,
+                            borderColor: completed
+                              ? theme.palette.accent
+                              : theme.palette.border,
                             backgroundColor: completed
                               ? `${theme.palette.accent}22`
                               : theme.palette.panelSoft,
                           },
-                        ]}>
+                        ]}
+                      >
                         <Pressable
+                          delayLongPress={260}
+                          onPressIn={() => {
+                            didLongPressSetBoxRef.current = false;
+                          }}
+                          onLongPress={() => {
+                            didLongPressSetBoxRef.current = true;
+                            handleSetLongPress(setEntry);
+                          }}
                           onPress={() => {
+                            if (didLongPressSetBoxRef.current) {
+                              didLongPressSetBoxRef.current = false;
+                              return;
+                            }
+
                             void handleSetPress(setEntry);
                           }}
-                          style={({ pressed }) => [styles.setBoxMain, { opacity: pressed ? opacity.pressedSoft : 1 }]}>
+                          style={({ pressed }) => [
+                            styles.setBoxMain,
+                            { opacity: pressed ? opacity.pressedSoft : 1 },
+                          ]}
+                        >
                           <AppText variant="micro" tone="muted">
                             Set {setEntry.setNumber}
                           </AppText>
-                          <AppText variant="heading" tone={completed ? 'accent' : 'primary'}>
-                            {completed ? setEntry.actualReps : '--'}
+                          <AppText
+                            variant="heading"
+                            tone={completed ? "accent" : "primary"}
+                          >
+                            {completed ? setEntry.actualReps : "--"}
                           </AppText>
                           <AppText variant="micro" tone="muted">
                             / {setEntry.targetReps}
@@ -990,16 +1494,22 @@ export default function WorkoutsScreen() {
                           style={({ pressed }) => [
                             styles.setBoxWeightBar,
                             {
-                              borderTopColor: completed ? `${theme.palette.accent}66` : theme.palette.border,
+                              borderTopColor: completed
+                                ? `${theme.palette.accentContrast}33`
+                                : theme.palette.border,
                               backgroundColor: completed
-                                ? `${theme.palette.accent}1a`
+                                ? theme.palette.accent
                                 : `${theme.palette.background}4a`,
                               opacity: pressed ? opacity.pressedSoft : 1,
                             },
-                          ]}>
-                          <AppText variant="micro" tone={completed ? 'accent' : 'muted'}>
+                          ]}
+                        >
+                          <AppText
+                            variant="micro"
+                            tone={completed ? "inverse" : "muted"}
+                          >
                             {setWeight}
-                            {setIsAssisted ? ' assisted' : ''}
+                            {setIsAssisted ? " assisted" : ""}
                           </AppText>
                         </Pressable>
                       </View>
@@ -1017,13 +1527,39 @@ export default function WorkoutsScreen() {
                 {
                   borderColor: theme.palette.danger,
                 },
-              ]}>
+              ]}
+            >
               <AppText tone="danger">{sessionActionError ?? error}</AppText>
             </View>
           ) : null}
+
+          <View style={styles.sessionFinishWrap}>
+            <View style={styles.sessionFinishRow}>
+              <View style={styles.sessionFinishPrimaryCell}>
+                <NeonButton
+                  title="Finish & Save"
+                  onPress={() => void handleFinishSession()}
+                  disabled={mutating}
+                />
+              </View>
+              <View style={styles.sessionFinishDangerCell}>
+                <NeonButton
+                  title="Delete"
+                  variant="danger"
+                  onPress={openDiscardSessionModal}
+                  disabled={mutating}
+                />
+              </View>
+            </View>
+          </View>
         </ScrollView>
 
-        <Modal visible={customSetId !== null} transparent animationType="fade" onRequestClose={closeCustomRepsModal}>
+        <Modal
+          visible={customSetId !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={closeCustomRepsModal}
+        >
           <View style={styles.modalBackdrop}>
             <View
               style={[
@@ -1032,23 +1568,33 @@ export default function WorkoutsScreen() {
                   borderColor: theme.palette.border,
                   backgroundColor: theme.palette.panel,
                 },
-              ]}>
-              <AppText variant="heading">Edit Set</AppText>
-              <AppText tone="muted">Update reps and working weight for this set.</AppText>
+              ]}
+            >
+              <AppText variant="heading">
+                {customSetEditMode === "reps" ? "Edit Reps" : "Edit Weight"}
+              </AppText>
+              <AppText tone="muted">
+                {customSetEditMode === "reps"
+                  ? "Set a custom rep count for this set."
+                  : "Adjust the working weight for this set."}
+              </AppText>
 
-              <NeonInput
-                label="Reps"
-                keyboardType="number-pad"
-                value={customSetRepsInput}
-                onChangeText={setCustomSetRepsInput}
-              />
-              <NeonInput
-                label="Weight"
-                keyboardType={WEIGHT_KEYBOARD_TYPE}
-                value={customSetWeightInput}
-                onChangeText={setCustomSetWeightInput}
-                suffix={settings.weightUnit}
-              />
+              {customSetEditMode === "reps" ? (
+                <NeonInput
+                  label="Reps"
+                  keyboardType="number-pad"
+                  value={customSetRepsInput}
+                  onChangeText={setCustomSetRepsInput}
+                />
+              ) : (
+                <NeonInput
+                  label="Weight"
+                  keyboardType={WEIGHT_KEYBOARD_TYPE}
+                  value={customSetWeightInput}
+                  onChangeText={setCustomSetWeightInput}
+                  suffix={settings.weightUnit}
+                />
+              )}
 
               {customSetError ? (
                 <View
@@ -1057,25 +1603,87 @@ export default function WorkoutsScreen() {
                     {
                       borderColor: theme.palette.danger,
                     },
-                  ]}>
+                  ]}
+                >
                   <AppText tone="danger">{customSetError}</AppText>
                 </View>
               ) : null}
 
               <View style={styles.modalActions}>
                 <View style={styles.modalActionCell}>
-                  <NeonButton title="Cancel" variant="ghost" onPress={closeCustomRepsModal} />
+                  <NeonButton
+                    title="Cancel"
+                    variant="ghost"
+                    onPress={closeCustomRepsModal}
+                  />
                 </View>
                 <View style={styles.modalActionCell}>
-                  <NeonButton title="Save" onPress={() => void saveCustomSetValues()} />
+                  <NeonButton
+                    title="Save"
+                    onPress={() => void saveCustomSetValues()}
+                  />
                 </View>
               </View>
             </View>
           </View>
         </Modal>
-      </View>
-    );
-  }
+        <Modal
+          visible={isDiscardSessionModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={closeDiscardSessionModal}
+        >
+          <View style={styles.modalBackdrop}>
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  borderColor: theme.palette.border,
+                  backgroundColor: theme.palette.panel,
+                },
+              ]}
+            >
+              <AppText variant="heading">Discard Workout Session?</AppText>
+              <AppText tone="muted">
+                This active workout will be removed permanently. This action
+                cannot be undone.
+              </AppText>
+              <View
+                style={[
+                  styles.errorBox,
+                  {
+                    borderColor: `${theme.palette.danger}99`,
+                    backgroundColor: `${theme.palette.danger}1a`,
+                  },
+                ]}
+              >
+                <AppText tone="danger">
+                  Discarding clears all sets logged in this active session.
+                </AppText>
+              </View>
+              <View style={styles.modalActions}>
+                <View style={styles.modalActionCell}>
+                  <NeonButton
+                    title="Keep Session"
+                    variant="ghost"
+                    onPress={closeDiscardSessionModal}
+                    disabled={mutating}
+                  />
+                </View>
+                <View style={styles.modalActionCell}>
+                  <NeonButton
+                    title="Discard"
+                    variant="danger"
+                    onPress={() => void handleDiscardSession()}
+                    disabled={mutating}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </Animated.View>
+    ) : null;
 
   return (
     <View
@@ -1084,7 +1692,8 @@ export default function WorkoutsScreen() {
         {
           backgroundColor: theme.palette.background,
         },
-      ]}>
+      ]}
+    >
       <NeonGridBackground />
 
       <KeyboardAwareScrollView
@@ -1101,48 +1710,9 @@ export default function WorkoutsScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}
-        style={styles.keyboardRoot}>
-        <View
-          style={[
-            compactHero ? styles.heroCompact : styles.heroCard,
-            {
-              borderColor: theme.palette.border,
-              backgroundColor: theme.palette.panel,
-            },
-          ]}>
-          {compactHero ? (
-            <>
-              <View style={styles.compactHeroTextWrap}>
-                <AppText variant="label" tone="accent">
-                  WORKOUT TRACKER
-                </AppText>
-                <AppText variant="heading">Workouts ready</AppText>
-              </View>
-              {!isComposerOpen ? (
-                <NeonButton title="Add workout" variant="ghost" onPress={openComposer} />
-              ) : (
-                <NeonButton title="Close builder" variant="ghost" onPress={closeComposer} />
-              )}
-            </>
-          ) : (
-            <>
-              <AppText variant="micro" tone="accent">
-                WORKOUT TRACKER
-              </AppText>
-              <AppText variant="display">Plan. Lift. Progress.</AppText>
-              <AppText tone="muted">
-                Create workouts, then start a focused session with live timer and set tracking.
-                Default overload is {defaultOverload}.
-              </AppText>
-
-              {!isComposerOpen ? (
-                <NeonButton title="Add workout" onPress={openComposer} />
-              ) : (
-                <NeonButton title="Close builder" variant="ghost" onPress={closeComposer} />
-              )}
-            </>
-          )}
-        </View>
+        style={styles.keyboardRoot}
+      >
+        {!moveTrackerCardToBottom ? renderTrackerCard() : null}
 
         {isComposerOpen ? (
           <View
@@ -1152,9 +1722,10 @@ export default function WorkoutsScreen() {
                 borderColor: theme.palette.border,
                 backgroundColor: theme.palette.panel,
               },
-            ]}>
+            ]}
+          >
             <AppText variant="heading">
-              {editingWorkoutId ? 'Edit Workout Template' : 'Workout Builder'}
+              {editingWorkoutId ? "Edit Workout Template" : "Workout Builder"}
             </AppText>
 
             <NeonInput
@@ -1170,7 +1741,9 @@ export default function WorkoutsScreen() {
 
             <View style={styles.exerciseChipContainer}>
               {EXERCISE_LIBRARY.map((exerciseName) => {
-                const selected = selectedExercises.has(exerciseName.toLowerCase());
+                const selected = selectedExercises.has(
+                  exerciseName.toLowerCase()
+                );
 
                 return (
                   <Pressable
@@ -1179,12 +1752,20 @@ export default function WorkoutsScreen() {
                     style={({ pressed }) => [
                       styles.exerciseChip,
                       {
-                        borderColor: selected ? theme.palette.accent : theme.palette.border,
-                        backgroundColor: selected ? `${theme.palette.accent}2b` : theme.palette.panelSoft,
+                        borderColor: selected
+                          ? theme.palette.accent
+                          : theme.palette.border,
+                        backgroundColor: selected
+                          ? `${theme.palette.accent}2b`
+                          : theme.palette.panelSoft,
                         opacity: pressed ? opacity.pressedSoft : 1,
                       },
-                    ]}>
-                    <AppText variant="micro" tone={selected ? 'accent' : 'muted'}>
+                    ]}
+                  >
+                    <AppText
+                      variant="micro"
+                      tone={selected ? "accent" : "muted"}
+                    >
                       {exerciseName}
                     </AppText>
                   </Pressable>
@@ -1201,14 +1782,22 @@ export default function WorkoutsScreen() {
                   onChangeText={setCustomExerciseName}
                 />
               </View>
-              <NeonButton title="Add" variant="ghost" onPress={addCustomExercise} />
+              <NeonButton
+                title="Add"
+                variant="ghost"
+                onPress={addCustomExercise}
+              />
             </View>
 
             <View style={styles.exerciseDraftContainer}>
               {exerciseDrafts.map((draft) => {
-                const parsedRestSeconds = parseRestSecondsInput(draft.restSeconds);
+                const parsedRestSeconds = parseRestSecondsInput(
+                  draft.restSeconds
+                );
                 const restSeconds =
-                  parsedRestSeconds === null ? DEFAULT_REST_SECONDS : clampRestSeconds(parsedRestSeconds);
+                  parsedRestSeconds === null
+                    ? DEFAULT_REST_SECONDS
+                    : clampRestSeconds(parsedRestSeconds);
 
                 return (
                   <View
@@ -1219,14 +1808,22 @@ export default function WorkoutsScreen() {
                         borderColor: theme.palette.border,
                         backgroundColor: theme.palette.panelSoft,
                       },
-                    ]}>
+                    ]}
+                  >
                     <View style={styles.exerciseDraftHeader}>
                       <AppText variant="heading">{draft.name}</AppText>
                       <Pressable
-                      onPress={() => removeExerciseDraft(draft.id)}
-                      hitSlop={8}
-                      style={({ pressed }) => ({ opacity: pressed ? opacity.pressedMedium : 1 })}>
-                        <Ionicons name="close" size={sizes.iconSmall} color={theme.palette.textMuted} />
+                        onPress={() => removeExerciseDraft(draft.id)}
+                        hitSlop={8}
+                        style={({ pressed }) => ({
+                          opacity: pressed ? opacity.pressedMedium : 1,
+                        })}
+                      >
+                        <Ionicons
+                          name="close"
+                          size={sizes.iconSmall}
+                          color={theme.palette.textMuted}
+                        />
                       </Pressable>
                     </View>
 
@@ -1236,7 +1833,9 @@ export default function WorkoutsScreen() {
                           label="Sets"
                           keyboardType="number-pad"
                           value={draft.sets}
-                          onChangeText={(value) => updateExerciseDraft(draft.id, { sets: value })}
+                          onChangeText={(value) =>
+                            updateExerciseDraft(draft.id, { sets: value })
+                          }
                         />
                       </View>
                       <View style={styles.fieldCell}>
@@ -1244,7 +1843,9 @@ export default function WorkoutsScreen() {
                           label="Reps"
                           keyboardType="number-pad"
                           value={draft.reps}
-                          onChangeText={(value) => updateExerciseDraft(draft.id, { reps: value })}
+                          onChangeText={(value) =>
+                            updateExerciseDraft(draft.id, { reps: value })
+                          }
                         />
                       </View>
                     </View>
@@ -1256,7 +1857,11 @@ export default function WorkoutsScreen() {
                           helperText="Use a negative value for assisted movements."
                           keyboardType={WEIGHT_KEYBOARD_TYPE}
                           value={draft.startWeight}
-                          onChangeText={(value) => updateExerciseDraft(draft.id, { startWeight: value })}
+                          onChangeText={(value) =>
+                            updateExerciseDraft(draft.id, {
+                              startWeight: value,
+                            })
+                          }
                           suffix={settings.weightUnit}
                         />
                       </View>
@@ -1266,7 +1871,9 @@ export default function WorkoutsScreen() {
                           helperText={`Default: ${defaultOverload}`}
                           keyboardType="decimal-pad"
                           value={draft.overload}
-                          onChangeText={(value) => updateExerciseDraft(draft.id, { overload: value })}
+                          onChangeText={(value) =>
+                            updateExerciseDraft(draft.id, { overload: value })
+                          }
                           suffix={settings.weightUnit}
                         />
                       </View>
@@ -1279,13 +1886,19 @@ export default function WorkoutsScreen() {
                           borderColor: theme.palette.border,
                           backgroundColor: theme.palette.panel,
                         },
-                      ]}>
+                      ]}
+                    >
                       <AppText variant="micro" tone="muted">
                         Rest Timer
                       </AppText>
                       <View style={styles.restDraftControls}>
                         <Pressable
-                          onPress={() => adjustDraftRestSeconds(draft.id, -REST_TIMER_STEP_SECONDS)}
+                          onPress={() =>
+                            adjustDraftRestSeconds(
+                              draft.id,
+                              -REST_TIMER_STEP_SECONDS
+                            )
+                          }
                           style={({ pressed }) => [
                             styles.restDraftButton,
                             {
@@ -1293,14 +1906,26 @@ export default function WorkoutsScreen() {
                               backgroundColor: theme.palette.panelSoft,
                               opacity: pressed ? opacity.pressedSoft : 1,
                             },
-                          ]}>
-                          <Ionicons name="remove" size={layout.screenTopInset} color={theme.palette.textPrimary} />
+                          ]}
+                        >
+                          <Ionicons
+                            name="remove"
+                            size={layout.screenTopInset}
+                            color={theme.palette.textPrimary}
+                          />
                         </Pressable>
                         <View style={styles.restDraftValue}>
-                          <AppText variant="label">{formatDuration(restSeconds * 1000)}</AppText>
+                          <AppText variant="label">
+                            {formatDuration(restSeconds * 1000)}
+                          </AppText>
                         </View>
                         <Pressable
-                          onPress={() => adjustDraftRestSeconds(draft.id, REST_TIMER_STEP_SECONDS)}
+                          onPress={() =>
+                            adjustDraftRestSeconds(
+                              draft.id,
+                              REST_TIMER_STEP_SECONDS
+                            )
+                          }
                           style={({ pressed }) => [
                             styles.restDraftButton,
                             {
@@ -1308,8 +1933,13 @@ export default function WorkoutsScreen() {
                               backgroundColor: theme.palette.panelSoft,
                               opacity: pressed ? opacity.pressedSoft : 1,
                             },
-                          ]}>
-                          <Ionicons name="add" size={layout.screenTopInset} color={theme.palette.textPrimary} />
+                          ]}
+                        >
+                          <Ionicons
+                            name="add"
+                            size={layout.screenTopInset}
+                            color={theme.palette.textPrimary}
+                          />
                         </Pressable>
                       </View>
                     </View>
@@ -1325,13 +1955,14 @@ export default function WorkoutsScreen() {
                   {
                     borderColor: theme.palette.danger,
                   },
-                ]}>
+                ]}
+              >
                 <AppText tone="danger">{formError}</AppText>
               </View>
             ) : null}
 
             <NeonButton
-              title={editingWorkoutId ? 'Save Template' : 'Save Workout'}
+              title={editingWorkoutId ? "Save Template" : "Save Workout"}
               onPress={() => void submitWorkout()}
               disabled={mutating}
             />
@@ -1346,7 +1977,8 @@ export default function WorkoutsScreen() {
                 borderColor: theme.palette.accent,
                 backgroundColor: theme.palette.panel,
               },
-            ]}>
+            ]}
+          >
             <View style={styles.resumeBannerTextWrap}>
               <AppText variant="label" tone="accent">
                 Active Session
@@ -1376,7 +2008,8 @@ export default function WorkoutsScreen() {
               {
                 borderColor: theme.palette.danger,
               },
-            ]}>
+            ]}
+          >
             <AppText tone="danger">{error}</AppText>
           </View>
         ) : null}
@@ -1388,7 +2021,8 @@ export default function WorkoutsScreen() {
               {
                 borderColor: theme.palette.danger,
               },
-            ]}>
+            ]}
+          >
             <AppText tone="danger">{sessionActionError}</AppText>
           </View>
         ) : null}
@@ -1401,19 +2035,26 @@ export default function WorkoutsScreen() {
                 borderColor: theme.palette.border,
                 backgroundColor: theme.palette.panel,
               },
-            ]}>
+            ]}
+          >
             <AppText variant="heading">No workouts yet</AppText>
             <AppText tone="muted">
-              Add your first workout to unlock quick starts, live timer tracking, and set-by-set session logs.
+              Add your first workout to unlock quick starts, live timer
+              tracking, and set-by-set session logs.
             </AppText>
           </View>
         ) : null}
 
         {workouts.map((workout) => {
-          const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+          const totalSets = workout.exercises.reduce(
+            (sum, exercise) => sum + exercise.sets,
+            0
+          );
           const lastSession = workout.sessions[0];
-          const sessionBlocked = activeSession !== null && activeSession.workoutId !== workout.id;
-          const startButtonTitle = activeSession?.workoutId === workout.id ? 'Continue' : 'Start';
+          const sessionBlocked =
+            activeSession !== null && activeSession.workoutId !== workout.id;
+          const startButtonTitle =
+            activeSession?.workoutId === workout.id ? "Continue" : "Start";
 
           return (
             <View
@@ -1424,12 +2065,19 @@ export default function WorkoutsScreen() {
                   borderColor: theme.palette.border,
                   backgroundColor: theme.palette.panel,
                 },
-              ]}>
+              ]}
+            >
               <Pressable
                 onPress={() => {
                   void beginWorkout(workout.id);
                 }}
-                style={({ pressed }) => [{ opacity: pressed ? opacity.pressedStrong : 1, gap: spacing.lg }]}>
+                style={({ pressed }) => [
+                  {
+                    opacity: pressed ? opacity.pressedStrong : 1,
+                    gap: spacing.lg,
+                  },
+                ]}
+              >
                 <View style={styles.workoutCardHeader}>
                   <View style={styles.workoutCardHeaderText}>
                     <AppText variant="heading">{workout.name}</AppText>
@@ -1452,8 +2100,13 @@ export default function WorkoutsScreen() {
                           backgroundColor: theme.palette.panelSoft,
                           opacity: pressed ? opacity.pressedSoft : 1,
                         },
-                      ]}>
-                      <Ionicons name="create-outline" size={layout.screenTopInset} color={theme.palette.accent} />
+                      ]}
+                    >
+                      <Ionicons
+                        name="create-outline"
+                        size={layout.screenTopInset}
+                        color={theme.palette.accent}
+                      />
                     </Pressable>
                     <Pressable
                       onPress={(event) => {
@@ -1468,8 +2121,13 @@ export default function WorkoutsScreen() {
                           backgroundColor: theme.palette.panelSoft,
                           opacity: pressed ? opacity.pressedSoft : 1,
                         },
-                      ]}>
-                      <Ionicons name="trash-outline" size={layout.screenTopInset} color={theme.palette.danger} />
+                      ]}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={layout.screenTopInset}
+                        color={theme.palette.danger}
+                      />
                     </Pressable>
                   </View>
                 </View>
@@ -1482,7 +2140,8 @@ export default function WorkoutsScreen() {
                         borderColor: theme.palette.border,
                         backgroundColor: theme.palette.panelSoft,
                       },
-                    ]}>
+                    ]}
+                  >
                     <AppText variant="micro" tone="muted">
                       {workout.exercises.length} exercises
                     </AppText>
@@ -1494,7 +2153,8 @@ export default function WorkoutsScreen() {
                         borderColor: theme.palette.border,
                         backgroundColor: theme.palette.panelSoft,
                       },
-                    ]}>
+                    ]}
+                  >
                     <AppText variant="micro" tone="muted">
                       {totalSets} sets
                     </AppText>
@@ -1506,7 +2166,8 @@ export default function WorkoutsScreen() {
                         borderColor: theme.palette.border,
                         backgroundColor: theme.palette.panelSoft,
                       },
-                    ]}>
+                    ]}
+                  >
                     <AppText variant="micro" tone="muted">
                       ~{estimateWorkoutMinutes(workout)} min
                     </AppText>
@@ -1515,8 +2176,10 @@ export default function WorkoutsScreen() {
 
                 <AppText tone="muted">
                   {lastSession
-                    ? `Last completed on ${sessionDateFormatter.format(new Date(lastSession.performedAt))}`
-                    : 'No completed sessions yet.'}
+                    ? `Last completed on ${sessionDateFormatter.format(
+                        new Date(lastSession.performedAt)
+                      )}`
+                    : "No completed sessions yet."}
                 </AppText>
               </Pressable>
 
@@ -1542,7 +2205,10 @@ export default function WorkoutsScreen() {
             </View>
           );
         })}
+
+        {moveTrackerCardToBottom ? renderTrackerCard() : null}
       </KeyboardAwareScrollView>
+      {sessionScreen}
     </View>
   );
 }

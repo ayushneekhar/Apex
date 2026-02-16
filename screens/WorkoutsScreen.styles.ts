@@ -8,6 +8,15 @@ export const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  sessionScreenOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 40,
+    elevation: 40,
+  },
   keyboardRoot: {
     flex: 1,
   },
@@ -178,8 +187,12 @@ export const styles = StyleSheet.create({
   sessionHeader: {
     borderWidth: border.thin,
     borderRadius: radii.panel,
-    padding: spacing.lg,
-    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  sessionHeaderDetails: {
+    overflow: 'hidden',
+    gap: spacing.xs,
   },
   backButton: {
     flexDirection: 'row',
@@ -192,6 +205,49 @@ export const styles = StyleSheet.create({
     borderRadius: radii.panel,
     padding: spacing.xl,
     gap: spacing.lg,
+  },
+  timerValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  timerControlButton: {
+    width: sizes.iconButton,
+    height: sizes.iconButton,
+    borderWidth: border.thin,
+    borderRadius: radii.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spotifyCard: {
+    borderWidth: border.thin,
+    borderRadius: radii.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
+  },
+  spotifyTrackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  spotifyArtwork: {
+    width: sizes.iconLarge * 2,
+    height: sizes.iconLarge * 2,
+    borderRadius: radii.md,
+  },
+  spotifyArtworkFallback: {
+    width: sizes.iconLarge * 2,
+    height: sizes.iconLarge * 2,
+    borderWidth: border.thin,
+    borderRadius: radii.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  spotifyTrackText: {
+    flex: 1,
+    gap: spacing.xxxs,
   },
   restTimerCard: {
     borderWidth: border.thin,
@@ -229,16 +285,6 @@ export const styles = StyleSheet.create({
     minHeight: sizes.setBoxMinLabelHeight,
     textAlign: 'center',
   },
-  sessionVolumeRow: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
   bodyweightRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -255,11 +301,17 @@ export const styles = StyleSheet.create({
     borderRadius: radii.xl,
     padding: spacing.md,
   },
-  sessionActionRow: {
+  sessionFinishWrap: {
+    paddingTop: spacing.sm,
+  },
+  sessionFinishRow: {
     flexDirection: 'row',
     gap: spacing.md,
   },
-  sessionActionCell: {
+  sessionFinishPrimaryCell: {
+    flex: 2,
+  },
+  sessionFinishDangerCell: {
     flex: 1,
   },
   exerciseSessionCard: {

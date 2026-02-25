@@ -31,6 +31,80 @@ type SessionSetActionsDeps = {
   discardActiveWorkoutSession: () => Promise<void>;
 };
 
+type CustomSetSaveResult =
+  | {
+      error: string;
+    }
+  | {
+      reps: number;
+      weightKg: number;
+    };
+
+function getRestRemainingMs(activeRestTimer: ActiveRestTimer | null, now: number) {
+  if (!activeRestTimer) {
+    return 0;
+  }
+
+  return Math.max(0, activeRestTimer.endsAt - now);
+}
+
+function getRestProgress(activeRestTimer: ActiveRestTimer | null, restRemainingMs: number) {
+  if (!activeRestTimer || activeRestTimer.durationMs <= 0) {
+    return 0;
+  }
+
+  return Math.min(
+    1,
+    Math.max(0, (activeRestTimer.durationMs - restRemainingMs) / activeRestTimer.durationMs)
+  );
+}
+
+async function cancelRestNotificationIfPresent(notificationId: string | null) {
+  if (!notificationId) {
+    return;
+  }
+
+  await cancelScheduledNotification(notificationId);
+}
+
+function resolveCustomSetValues({
+  setEntry,
+  editMode,
+  repsInput,
+  weightInput,
+  weightUnit,
+}: {
+  setEntry: ActiveWorkoutSet;
+  editMode: CustomSetEditMode;
+  repsInput: string;
+  weightInput: string;
+  weightUnit: WeightUnit;
+}): CustomSetSaveResult {
+  if (editMode === 'reps') {
+    const parsedReps = Number.parseInt(repsInput.trim(), 10);
+
+    if (!Number.isFinite(parsedReps) || parsedReps < 0) {
+      return { error: 'Reps must be zero or above.' };
+    }
+
+    return {
+      reps: parsedReps,
+      weightKg: setEntry.actualWeightKg,
+    };
+  }
+
+  const parsedWeightKg = parseWeightInputToKg(weightInput.trim(), weightUnit);
+
+  if (parsedWeightKg === null) {
+    return { error: 'Weight is invalid. Use a valid number.' };
+  }
+
+  return {
+    reps: setEntry.actualReps,
+    weightKg: parsedWeightKg,
+  };
+}
+
 export function useWorkoutSessionSetActionsController({
   activeSession,
   weightUnit,
@@ -67,28 +141,14 @@ export function useWorkoutSessionSetActionsController({
     [activeSession?.sets, customSetId]
   );
 
-  const restRemainingMs = useMemo(() => {
-    if (!activeRestTimer) {
-      return 0;
-    }
-
-    return Math.max(0, activeRestTimer.endsAt - now);
-  }, [activeRestTimer, now]);
-
-  const restProgress = useMemo(() => {
-    if (!activeRestTimer || activeRestTimer.durationMs <= 0) {
-      return 0;
-    }
-
-    return Math.min(
-      1,
-      Math.max(
-        0,
-        (activeRestTimer.durationMs - restRemainingMs) /
-          activeRestTimer.durationMs
-      )
-    );
-  }, [activeRestTimer, restRemainingMs]);
+  const restRemainingMs = useMemo(
+    () => getRestRemainingMs(activeRestTimer, now),
+    [activeRestTimer, now]
+  );
+  const restProgress = useMemo(
+    () => getRestProgress(activeRestTimer, restRemainingMs),
+    [activeRestTimer, restRemainingMs]
+  );
 
   const restIsComplete = activeRestTimer !== null && restRemainingMs === 0;
 
@@ -99,7 +159,7 @@ export function useWorkoutSessionSetActionsController({
       setActiveRestTimer(null);
 
       if (restNotificationId) {
-        void cancelScheduledNotification(restNotificationId);
+        void cancelRestNotificationIfPresent(restNotificationId);
         setRestNotificationId(null);
       }
     }
@@ -110,7 +170,7 @@ export function useWorkoutSessionSetActionsController({
       return;
     }
 
-    void cancelScheduledNotification(restNotificationId);
+    void cancelRestNotificationIfPresent(restNotificationId);
     setRestNotificationId(null);
   }, [activeRestTimer, restRemainingMs, restNotificationId]);
 
@@ -140,38 +200,29 @@ export function useWorkoutSessionSetActionsController({
       return;
     }
 
-    let nextReps = customSetEntry.actualReps;
-    let nextWeightKg = customSetEntry.actualWeightKg;
+    const resolvedValues = resolveCustomSetValues({
+      setEntry: customSetEntry,
+      editMode: customSetEditMode,
+      repsInput: customSetRepsInput,
+      weightInput: customSetWeightInput,
+      weightUnit,
+    });
 
-    if (customSetEditMode === "reps") {
-      const parsedReps = Number.parseInt(customSetRepsInput.trim(), 10);
-
-      if (!Number.isFinite(parsedReps) || parsedReps < 0) {
-        setCustomSetError("Reps must be zero or above.");
-        return;
-      }
-
-      nextReps = parsedReps;
-    } else {
-      const parsedWeightKg = parseWeightInputToKg(
-        customSetWeightInput.trim(),
-        weightUnit
-      );
-
-      if (parsedWeightKg === null) {
-        setCustomSetError("Weight is invalid. Use a valid number.");
-        return;
-      }
-
-      nextWeightKg = parsedWeightKg;
+    if ('error' in resolvedValues) {
+      setCustomSetError(resolvedValues.error);
+      return;
     }
 
     try {
-      await setSessionSetCustomValues(customSetId, nextReps, nextWeightKg);
+      await setSessionSetCustomValues(
+        customSetId,
+        resolvedValues.reps,
+        resolvedValues.weightKg
+      );
       triggerSuccessHaptic();
       closeCustomSetModal();
     } catch {
-      setCustomSetError("Could not save set values. Try again.");
+      setCustomSetError('Could not save set values. Try again.');
     }
   }
 
@@ -182,9 +233,7 @@ export function useWorkoutSessionSetActionsController({
     setActiveRestTimer(null);
     setRestNotificationId(null);
 
-    if (notificationToCancel) {
-      await cancelScheduledNotification(notificationToCancel);
-    }
+    await cancelRestNotificationIfPresent(notificationToCancel);
   }
 
   async function startRestTimer(setEntry: ActiveWorkoutSet) {
@@ -206,7 +255,7 @@ export function useWorkoutSessionSetActionsController({
     setRestNotificationId(null);
 
     if (notificationToCancel) {
-      await cancelScheduledNotification(notificationToCancel);
+      await cancelRestNotificationIfPresent(notificationToCancel);
     }
 
     const nextNotificationId = await scheduleRestCompleteNotification(
@@ -215,7 +264,7 @@ export function useWorkoutSessionSetActionsController({
     );
 
     if (restScheduleTokenRef.current !== nextToken) {
-      await cancelScheduledNotification(nextNotificationId);
+      await cancelRestNotificationIfPresent(nextNotificationId);
       return;
     }
 

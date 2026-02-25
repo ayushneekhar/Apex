@@ -37,6 +37,29 @@ void SplashScreen.preventAutoHideAsync();
 
 const Tab = createBottomTabNavigator();
 
+const APP_TABS = [
+  {
+    name: "Workouts",
+    component: WorkoutsScreen,
+    iconName: "barbell-outline" as const,
+  },
+  {
+    name: "History",
+    component: HistoryScreen,
+    iconName: "time-outline" as const,
+  },
+  {
+    name: "Analytics",
+    component: AnalyticsScreen,
+    iconName: "stats-chart-outline" as const,
+  },
+  {
+    name: "Settings",
+    component: SettingsScreen,
+    iconName: "settings-outline" as const,
+  },
+] as const;
+
 function RootTabs({
   navigationTheme,
   theme,
@@ -54,42 +77,18 @@ function RootTabs({
           detachInactiveScreens={false}
           screenOptions={createTabScreenOptions(theme, insets)}
         >
-          <Tab.Screen
-            name="Workouts"
-            component={WorkoutsScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="barbell-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tab.Screen
-            name="History"
-            component={HistoryScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="time-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tab.Screen
-            name="Analytics"
-            component={AnalyticsScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="stats-chart-outline" size={size} color={color} />
-              ),
-            }}
-          />
-          <Tab.Screen
-            name="Settings"
-            component={SettingsScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => (
-                <Ionicons name="settings-outline" size={size} color={color} />
-              ),
-            }}
-          />
+          {APP_TABS.map((screen) => (
+            <Tab.Screen
+              key={screen.name}
+              name={screen.name}
+              component={screen.component}
+              options={{
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name={screen.iconName} size={size} color={color} />
+                ),
+              }}
+            />
+          ))}
         </Tab.Navigator>
         <StatusBar style={theme.statusBarStyle} />
       </NavigationContainer>

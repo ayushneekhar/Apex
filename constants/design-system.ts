@@ -79,7 +79,7 @@ export const designTokens = {
     neonWash: 0.22,
   },
   motion: {
-    overloadDurationMs: 520,
+    overloadDurationMs: 720,
   },
   grid: {
     defaultLineGap: 48,

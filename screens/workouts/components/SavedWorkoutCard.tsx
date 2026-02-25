@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 
@@ -19,11 +20,33 @@ type Props = {
 };
 
 export function SavedWorkoutCard({ controller, workout }: Props) {
-  const { theme, activeSession, mutating } = controller;
+  const { theme, activeSession } = controller;
+  const [isApplyingOverload, setIsApplyingOverload] = useState(false);
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
   const lastSession = workout.sessions[0];
   const sessionBlocked = activeSession !== null && activeSession.workoutId !== workout.id;
   const startButtonTitle = activeSession?.workoutId === workout.id ? 'Continue' : 'Start';
+  const handleBeginWorkout = useCallback(() => {
+    if (isApplyingOverload) {
+      return;
+    }
+
+    void controller.beginWorkout(workout.id);
+  }, [controller, isApplyingOverload, workout.id]);
+
+  const handleApplyOverload = useCallback(async () => {
+    if (isApplyingOverload) {
+      return;
+    }
+
+    setIsApplyingOverload(true);
+
+    try {
+      await controller.applyWeeklyOverload(workout.id);
+    } finally {
+      setIsApplyingOverload(false);
+    }
+  }, [controller, isApplyingOverload, workout.id]);
 
   return (
     <View
@@ -108,18 +131,16 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
         <View style={styles.actionButtonCell}>
           <NeonButton
             title={startButtonTitle}
-            onPress={() => {
-              void controller.beginWorkout(workout.id);
-            }}
-            disabled={sessionBlocked || mutating}
+            onPress={handleBeginWorkout}
+            disabled={sessionBlocked}
           />
         </View>
         <View style={styles.actionButtonCell}>
           <OverloadButton
             onPress={() => {
-              void controller.applyWeeklyOverload(workout.id);
+              void handleApplyOverload();
             }}
-            disabled={mutating}
+            disabled={isApplyingOverload}
           />
         </View>
       </View>

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView } from 'react-native';
 import type { EdgeInsets } from 'react-native-safe-area-context';
 import Animated, { Easing, SlideInRight, SlideOutRight } from 'react-native-reanimated';
 

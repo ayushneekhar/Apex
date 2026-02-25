@@ -27,10 +27,10 @@ export function OverloadButton({ disabled = false, onPress }: OverloadButtonProp
 
   const textAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: interpolate(progress.value, [0, 0.35, 0.75, 1], [1, 0, 0, 1], Extrapolation.CLAMP),
+      opacity: interpolate(progress.value, [0, 0.18, 0.86, 1], [1, 0, 0, 1], Extrapolation.CLAMP),
       transform: [
         {
-          translateY: interpolate(progress.value, [0, 0.35, 0.75, 1], [0, 14, 14, 0], Extrapolation.CLAMP),
+          translateY: interpolate(progress.value, [0, 0.18, 0.86, 1], [0, 10, 10, 0], Extrapolation.CLAMP),
         },
       ],
     };
@@ -38,13 +38,13 @@ export function OverloadButton({ disabled = false, onPress }: OverloadButtonProp
 
   const iconAnimatedStyle = useAnimatedStyle(() => {
     return {
-      opacity: interpolate(progress.value, [0, 0.2, 0.5, 0.85, 1], [0, 1, 1, 0, 0], Extrapolation.CLAMP),
+      opacity: interpolate(progress.value, [0, 0.14, 0.78, 0.94, 1], [0, 1, 1, 0, 0], Extrapolation.CLAMP),
       transform: [
         {
           translateY: interpolate(
             progress.value,
-            [0, 0.2, 0.5, 0.85, 1],
-            [-14, 0, 10, 18, 18],
+            [0, 0.14, 0.78, 0.94, 1],
+            [20, 0, -2, 8, 12],
             Extrapolation.CLAMP
           ),
         },
@@ -82,7 +82,7 @@ export function OverloadButton({ disabled = false, onPress }: OverloadButtonProp
           </AppText>
         </Animated.View>
 
-        <Animated.View style={[styles.layer, iconAnimatedStyle]}>
+        <Animated.View style={[styles.layer, iconAnimatedStyle]} pointerEvents="none">
           <Ionicons name="flash" size={sizes.iconTiny} color={theme.palette.accent} />
         </Animated.View>
       </View>

@@ -9,10 +9,11 @@ const SPOTIFY_DISCOVERY = {
   tokenEndpoint: 'https://accounts.spotify.com/api/token',
 };
 
-const SPOTIFY_SCOPES = ['user-read-playback-state', 'user-read-currently-playing'];
+const SPOTIFY_SCOPES = ['user-read-playback-state', 'user-read-currently-playing', 'user-modify-playback-state'];
 const SESSION_STORE_KEY = 'apex.spotify.session.v1';
 const REFRESH_LEEWAY_MS = 60_000;
 const DEFAULT_RETRY_AFTER_MS = 15_000;
+const SPOTIFY_PLAYER_ENDPOINT = 'https://api.spotify.com/v1/me/player';
 
 type SpotifyAuthSession = {
   accessToken: string;
@@ -51,6 +52,18 @@ type SpotifyPlaybackState = {
   item?: SpotifyTrack | null;
 };
 
+type SpotifyQueueResponse = {
+  queue?: SpotifyTrack[];
+};
+
+type SpotifyApiErrorPayload = {
+  error?:
+    | {
+        message?: string;
+      }
+    | string;
+};
+
 export type SpotifyNowPlaying = {
   songName: string;
   artistNames: string;
@@ -59,6 +72,15 @@ export type SpotifyNowPlaying = {
   trackUrl: string | null;
   isPlaying: boolean;
   progressMs: number;
+  durationMs: number;
+};
+
+export type SpotifyQueueTrack = {
+  songName: string;
+  artistNames: string;
+  albumName: string;
+  albumArtUrl: string | null;
+  trackUrl: string | null;
   durationMs: number;
 };
 
@@ -196,6 +218,51 @@ function getRetryAfterMs(response: Response): number {
   return retryAfter * 1000;
 }
 
+async function getSpotifyApiErrorMessage(response: Response): Promise<string | null> {
+  try {
+    const payload = (await response.json()) as SpotifyApiErrorPayload;
+
+    if (typeof payload.error === 'string') {
+      return payload.error.trim() || null;
+    }
+
+    if (typeof payload.error?.message === 'string') {
+      return payload.error.message.trim() || null;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function throwSpotifyResponseError(response: Response): Promise<never> {
+  if (response.status === 401) {
+    await disconnectSpotify();
+    throw new Error('Spotify session expired. Reconnect in Settings.');
+  }
+
+  if (response.status === 429) {
+    throw new SpotifyRateLimitError(getRetryAfterMs(response));
+  }
+
+  const apiMessage = await getSpotifyApiErrorMessage(response);
+
+  if (response.status === 404) {
+    throw new Error(
+      apiMessage ?? 'No active Spotify device found. Start playback on Spotify and try again.'
+    );
+  }
+
+  if (response.status === 403) {
+    throw new Error(
+      apiMessage ?? 'Spotify denied this action. Playback controls may require Spotify Premium.'
+    );
+  }
+
+  throw new Error(apiMessage ?? `Spotify request failed (${response.status}).`);
+}
+
 function toNowPlaying(playback: SpotifyPlaybackState): SpotifyNowPlaying | null {
   const track = playback.item;
 
@@ -214,6 +281,24 @@ function toNowPlaying(playback: SpotifyPlaybackState): SpotifyNowPlaying | null 
     trackUrl: track.external_urls?.spotify ?? null,
     isPlaying: Boolean(playback.is_playing),
     progressMs: typeof playback.progress_ms === 'number' ? Math.max(0, playback.progress_ms) : 0,
+    durationMs: typeof track.duration_ms === 'number' ? Math.max(0, track.duration_ms) : 0,
+  };
+}
+
+function toQueueTrack(track: SpotifyTrack | null | undefined): SpotifyQueueTrack | null {
+  if (!track || track.type !== 'track' || !track.name) {
+    return null;
+  }
+
+  const artists = (track.artists ?? []).map((artist) => artist.name).filter(Boolean);
+  const artwork = (track.album?.images ?? [])[0]?.url ?? null;
+
+  return {
+    songName: track.name,
+    artistNames: artists.length > 0 ? artists.join(', ') : 'Unknown artist',
+    albumName: track.album?.name ?? 'Unknown album',
+    albumArtUrl: artwork,
+    trackUrl: track.external_urls?.spotify ?? null,
     durationMs: typeof track.duration_ms === 'number' ? Math.max(0, track.duration_ms) : 0,
   };
 }
@@ -284,7 +369,7 @@ export async function getSpotifyNowPlaying(): Promise<SpotifyNowPlaying | null> 
     return null;
   }
 
-  const response = await fetch('https://api.spotify.com/v1/me/player', {
+  const response = await fetch(SPOTIFY_PLAYER_ENDPOINT, {
     method: 'GET',
     headers: {
       Authorization: `Bearer ${session.accessToken}`,
@@ -295,19 +380,77 @@ export async function getSpotifyNowPlaying(): Promise<SpotifyNowPlaying | null> 
     return null;
   }
 
-  if (response.status === 401) {
-    await disconnectSpotify();
-    throw new Error('Spotify session expired. Reconnect in Settings.');
-  }
-
-  if (response.status === 429) {
-    throw new SpotifyRateLimitError(getRetryAfterMs(response));
-  }
-
   if (!response.ok) {
-    throw new Error(`Spotify request failed (${response.status}).`);
+    await throwSpotifyResponseError(response);
   }
 
   const payload = (await response.json()) as SpotifyPlaybackState;
   return toNowPlaying(payload);
+}
+
+export async function getSpotifyNextQueuedTrack(): Promise<SpotifyQueueTrack | null> {
+  const session = await ensureFreshSpotifySession();
+
+  if (!session) {
+    return null;
+  }
+
+  const response = await fetch(`${SPOTIFY_PLAYER_ENDPOINT}/queue`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`,
+    },
+  });
+
+  if (response.status === 204) {
+    return null;
+  }
+
+  if (!response.ok) {
+    await throwSpotifyResponseError(response);
+  }
+
+  const payload = (await response.json()) as SpotifyQueueResponse;
+  return toQueueTrack((payload.queue ?? [])[0] ?? null);
+}
+
+async function sendSpotifyPlayerCommand(path: string, method: 'PUT' | 'POST'): Promise<void> {
+  const session = await ensureFreshSpotifySession();
+
+  if (!session) {
+    throw new Error('Spotify is not connected. Reconnect in Settings.');
+  }
+
+  if (!session.scope.includes('user-modify-playback-state')) {
+    throw new Error('Spotify playback permissions changed. Reconnect Spotify in Settings.');
+  }
+
+  const response = await fetch(`${SPOTIFY_PLAYER_ENDPOINT}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${session.accessToken}`,
+    },
+  });
+
+  if (response.status === 204 || response.ok) {
+    return;
+  }
+
+  await throwSpotifyResponseError(response);
+}
+
+export async function playSpotify(): Promise<void> {
+  await sendSpotifyPlayerCommand('/play', 'PUT');
+}
+
+export async function pauseSpotify(): Promise<void> {
+  await sendSpotifyPlayerCommand('/pause', 'PUT');
+}
+
+export async function skipSpotifyNext(): Promise<void> {
+  await sendSpotifyPlayerCommand('/next', 'POST');
+}
+
+export async function skipSpotifyPrevious(): Promise<void> {
+  await sendSpotifyPlayerCommand('/previous', 'POST');
 }

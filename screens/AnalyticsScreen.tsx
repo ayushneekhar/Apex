@@ -27,14 +27,24 @@ type MetricPoint = {
   valueKg: number;
 };
 
-function toPercentChange(start: number, end: number): string {
+function toPercentChange(start: number, end: number, sampleCount: number): string {
+  if (sampleCount < 2) {
+    return 'N/A';
+  }
+
   if (start <= 0) {
     return 'N/A';
   }
 
   const delta = ((end - start) / start) * 100;
-  const sign = delta > 0 ? '+' : '';
-  return `${sign}${delta.toFixed(1)}%`;
+  const roundedDelta = Number(delta.toFixed(1));
+
+  if (Math.abs(roundedDelta) === 0) {
+    return 'No change';
+  }
+
+  const sign = roundedDelta > 0 ? '+' : '';
+  return `${sign}${roundedDelta.toFixed(1)}%`;
 }
 
 function MetricLineChart({
@@ -58,29 +68,64 @@ function MetricLineChart({
     );
   }
 
+  if (points.length === 1) {
+    return (
+      <View style={styles.chartWrap}>
+        <View style={[styles.singlePointChart, { borderColor: axisColor }]}>
+          <View style={[styles.singlePointGuideLine, { backgroundColor: axisColor }]} />
+          <View style={[styles.singlePointStub, { backgroundColor: lineColor }]} />
+          <View style={[styles.singlePointDot, { backgroundColor: lineColor, borderColor: lineColor }]} />
+        </View>
+        <View style={styles.singlePointFooter}>
+          <AppText variant="micro" tone="muted">
+            {points[0].label}
+          </AppText>
+          <AppText variant="micro" tone="muted">
+            Add one more workout to see a trend line
+          </AppText>
+        </View>
+      </View>
+    );
+  }
+
   const labelStride = points.length > 6 ? 2 : 1;
-  const baseData: lineDataItem[] = points.map((point, index) => ({
-    value: Number(point.valueKg.toFixed(2)),
-    label: index % labelStride === 0 ? point.label : '',
-  }));
-  const hasSinglePoint = baseData.length === 1;
-  const chartData: lineDataItem[] = hasSinglePoint
-    ? [
-        baseData[0],
-        {
-          value: baseData[0].value,
-          label: '',
-          hideDataPoint: true,
-        },
-      ]
-    : baseData;
+  const baseData: lineDataItem[] = points.map((point, index) => {
+    const shouldShowLabel = index % labelStride === 0;
+    const isFirstLabel = shouldShowLabel && index === 0;
+    const isLastLabel = shouldShowLabel && index === points.length - 1;
+    const labelTextAlign: 'left' | 'center' | 'right' = isFirstLabel
+      ? 'left'
+      : isLastLabel
+        ? 'right'
+        : 'center';
+
+    const perPointLabelTextStyle = shouldShowLabel
+      ? {
+          fontFamily: 'Unbounded_400Regular',
+          fontSize: 10,
+          lineHeight: 14,
+          letterSpacing: 0.35,
+          color: mutedColor,
+          textAlign: labelTextAlign,
+          paddingLeft: isFirstLabel ? 14 : 0,
+          paddingRight: isLastLabel ? 14 : 0,
+        }
+      : undefined;
+
+    return {
+      value: Number(point.valueKg.toFixed(2)),
+      label: shouldShowLabel ? point.label : '',
+      ...(perPointLabelTextStyle ? { labelTextStyle: perPointLabelTextStyle } : {}),
+    };
+  });
+  const chartData: lineDataItem[] = baseData;
   const peakValue = Math.max(...chartData.map((point) => point.value ?? 0), 1);
 
   return (
     <View style={styles.chartWrap}>
       <LineChart
-        areaChart={!hasSinglePoint}
-        curved={!hasSinglePoint}
+        areaChart
+        curved
         isAnimated
         animateOnDataChange
         animationDuration={850}
@@ -105,10 +150,10 @@ function MetricLineChart({
         dataPointsColor={lineColor}
         adjustToWidth
         spacing={42}
-        initialSpacing={10}
-        endSpacing={10}
-        xAxisLabelsHeight={36}
-        xAxisLabelsVerticalShift={8}
+        initialSpacing={18}
+        endSpacing={18}
+        xAxisLabelsHeight={44}
+        xAxisLabelsVerticalShift={10}
         hideOrigin
         showVerticalLines={false}
         showXAxisIndices={false}
@@ -225,6 +270,7 @@ export default function AnalyticsScreen() {
 
       return {
         exerciseName,
+        sampleCount: series.length,
         points: series.slice(-10).map((point) => ({
           label: sessionLabelFormatter.format(new Date(point.performedAt)),
           valueKg: point.valueKg,
@@ -390,7 +436,11 @@ export default function AnalyticsScreen() {
                   <AppText tone="muted">
                     Change:{' '}
                     {exerciseCard.startValueKg !== null && exerciseCard.latestValueKg !== null
-                      ? toPercentChange(Math.abs(exerciseCard.startValueKg), Math.abs(exerciseCard.latestValueKg))
+                      ? toPercentChange(
+                          Math.abs(exerciseCard.startValueKg),
+                          Math.abs(exerciseCard.latestValueKg),
+                          exerciseCard.sampleCount,
+                        )
                       : 'N/A'}
                   </AppText>
                 </View>
@@ -455,7 +505,7 @@ export default function AnalyticsScreen() {
           <AppText tone="muted">
             Change:{' '}
             {bodyweightStart !== null && bodyweightLatest !== null
-              ? toPercentChange(bodyweightStart, bodyweightLatest)
+              ? toPercentChange(bodyweightStart, bodyweightLatest, bodyweightSeries.length)
               : 'N/A'}
           </AppText>
         </View>

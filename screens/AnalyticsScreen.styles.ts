@@ -46,6 +46,8 @@ export const styles = StyleSheet.create({
   },
   chartWrap: {
     paddingTop: spacing.xs,
+    gap: spacing.xs,
+    paddingBottom: spacing.xs,
   },
   chartAxisText: {
     fontFamily: 'Unbounded_400Regular',
@@ -58,6 +60,39 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.xxxl,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+  },
+  singlePointChart: {
+    height: 188,
+    borderRadius: radii.xl,
+    borderWidth: border.thin,
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  singlePointGuideLine: {
+    position: 'absolute',
+    left: spacing.md,
+    right: spacing.md,
+    height: 1,
+    opacity: 0.45,
+  },
+  singlePointStub: {
+    width: 56,
+    height: 3,
+    borderRadius: radii.pill,
+    opacity: 0.95,
+  },
+  singlePointDot: {
+    position: 'absolute',
+    width: 10,
+    height: 10,
+    borderRadius: radii.pill,
+    borderWidth: 2,
+  },
+  singlePointFooter: {
+    gap: 2,
+    paddingHorizontal: spacing.xs,
   },
   metricRow: {
     flexDirection: 'row',

@@ -681,8 +681,8 @@ export async function exportDatabaseBackup(): Promise<string | null> {
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const backupFile = new File(destinationDirectory.uri, `apex-backup-${timestamp}.db`);
-    backupFile.create({ overwrite: true });
-    backupFile.write(serialized);
+    await backupFile.create({ overwrite: true });
+    await backupFile.write(serialized);
 
     return backupFile.uri;
   } catch (error) {

@@ -36,6 +36,9 @@ export default function SettingsScreen() {
   const importBackup = useAppStore((state) => state.importBackup);
   const setTheme = useAppStore((state) => state.setTheme);
   const setWeightUnit = useAppStore((state) => state.setWeightUnit);
+  const setNitroOtaUpdateCheck = useAppStore(
+    (state) => state.setNitroOtaUpdateCheck
+  );
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyBusy, setSpotifyBusy] = useState(false);
@@ -116,6 +119,7 @@ export default function SettingsScreen() {
       setNitroOtaSnapshot(snapshot);
 
       if (!snapshot.enabled) {
+        setNitroOtaUpdateCheck(null);
         setUpdateStatus("Updates are not available on this build.");
         return;
       }
@@ -123,24 +127,28 @@ export default function SettingsScreen() {
       const checkResult = await checkNitroOtaForUpdates();
 
       if (!checkResult?.hasUpdate) {
+        setNitroOtaUpdateCheck(null);
         setUpdateStatus("You’re on the latest version.");
         return;
       }
 
       if (!checkResult.isCompatible) {
+        setNitroOtaUpdateCheck(null);
         setUpdateStatus("An update was found but is not compatible yet.");
         return;
       }
 
-      setUpdateStatus("A new update is available. You’ll see a prompt shortly.");
+      setNitroOtaUpdateCheck(checkResult);
+      setUpdateStatus(null);
     } catch (error) {
+      setNitroOtaUpdateCheck(null);
       setUpdateStatus(
         error instanceof Error ? error.message : "Failed to check for updates."
       );
     } finally {
       setUpdateBusy(false);
     }
-  }, []);
+  }, [setNitroOtaUpdateCheck]);
 
   const handleExportBackup = async () => {
     try {

@@ -21,6 +21,7 @@ import {
   updateWorkoutSession,
 } from '@/lib/database';
 import { createId } from '@/lib/id';
+import type { NitroOtaUpdateCheck } from '@/lib/nitro-ota';
 import type { WeightUnit } from '@/lib/weight';
 import type {
   ActiveWorkoutSession,
@@ -42,8 +43,10 @@ type AppStoreState = {
   settings: AppSettings;
   workouts: Workout[];
   activeSession: ActiveWorkoutSession | null;
+  nitroOtaUpdateCheck: NitroOtaUpdateCheck | null;
   bootstrap: () => Promise<void>;
   clearError: () => void;
+  setNitroOtaUpdateCheck: (updateCheck: NitroOtaUpdateCheck | null) => void;
   refreshWorkouts: () => Promise<void>;
   exportBackup: () => Promise<string | null>;
   importBackup: () => Promise<boolean>;
@@ -238,6 +241,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   workouts: [],
   activeSession: null,
+  nitroOtaUpdateCheck: null,
   bootstrap: async () => {
     if (get().hydrated || get().bootstrapping) {
       return;
@@ -263,6 +267,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
   clearError: () => set({ error: null }),
+  setNitroOtaUpdateCheck: (nitroOtaUpdateCheck) => set({ nitroOtaUpdateCheck }),
   refreshWorkouts: async () => {
     set({ workoutsLoading: true, error: null });
 

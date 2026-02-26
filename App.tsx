@@ -178,7 +178,10 @@ export default function App() {
   const bootstrapError = useAppStore((state) => state.error);
   const hydrated = useAppStore((state) => state.hydrated);
   const bootstrap = useAppStore((state) => state.bootstrap);
-  const [updateCheck, setUpdateCheck] = useState<NitroOtaUpdateCheck | null>(null);
+  const updateCheck = useAppStore((state) => state.nitroOtaUpdateCheck);
+  const setNitroOtaUpdateCheck = useAppStore(
+    (state) => state.setNitroOtaUpdateCheck
+  );
   const [updateBusy, setUpdateBusy] = useState(false);
 
   const [fontsLoaded] = useFonts({
@@ -227,11 +230,11 @@ export default function App() {
         const result = await checkNitroOtaForUpdates();
 
         if (!cancelled) {
-          setUpdateCheck(result);
+          setNitroOtaUpdateCheck(result);
         }
       } catch {
         if (!cancelled) {
-          setUpdateCheck(null);
+          setNitroOtaUpdateCheck(null);
         }
       }
     };
@@ -241,11 +244,11 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [appReady]);
+  }, [appReady, setNitroOtaUpdateCheck]);
 
   const handleDismissUpdate = useCallback(() => {
-    setUpdateCheck(null);
-  }, []);
+    setNitroOtaUpdateCheck(null);
+  }, [setNitroOtaUpdateCheck]);
 
   const handleApplyUpdate = useCallback(async () => {
     setUpdateBusy(true);
@@ -254,7 +257,7 @@ export default function App() {
       const result = await checkNitroOtaForUpdates();
 
       if (!result?.hasUpdate || !result.isCompatible) {
-        setUpdateCheck(null);
+        setNitroOtaUpdateCheck(null);
         return;
       }
 
@@ -265,7 +268,7 @@ export default function App() {
     } finally {
       setUpdateBusy(false);
     }
-  }, []);
+  }, [setNitroOtaUpdateCheck]);
 
   const navigationTheme = useMemo<Theme>(() => {
     return {

@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>apex</string>
-          <string>com.anonymous.Apex</string>
+          <string>com.neekhar.apex</string>
         </array>
       </dict>
     </array>

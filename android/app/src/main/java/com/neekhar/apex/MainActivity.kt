@@ -1,4 +1,4 @@
-package com.anonymous.Apex
+package com.neekhar.apex
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

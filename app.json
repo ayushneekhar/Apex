@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Apex",
+      "bundleIdentifier": "com.neekhar.apex",
       "buildNumber": "1"
     },
     "android": {
@@ -22,7 +22,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Apex",
+      "package": "com.neekhar.apex",
       "versionCode": 3
     },
     "web": {

@@ -1,4 +1,5 @@
 import Expo
+import NitroOtaBundleManager
 import React
 import ReactAppDependencyProvider
 
@@ -64,6 +65,10 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 #if DEBUG
     return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
 #else
+    if let bundleURL = NitroOtaBundleManager.shared.getStoredBundleURL() {
+      return bundleURL
+    }
+
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
   }

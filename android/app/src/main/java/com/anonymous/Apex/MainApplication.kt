@@ -12,6 +12,7 @@ import com.facebook.react.ReactHost
 import com.facebook.react.common.ReleaseLevel
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint
 import com.facebook.react.defaults.DefaultReactNativeHost
+import com.margelo.nitro.nitroota.core.getStoredBundlePath
 
 import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
@@ -30,6 +31,8 @@ class MainApplication : Application(), ReactApplication {
           override fun getJSMainModuleName(): String = ".expo/.virtual-metro-entry"
 
           override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
+
+          override fun getJSBundleFile(): String? = getStoredBundlePath(this@MainApplication)
 
           override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
       }

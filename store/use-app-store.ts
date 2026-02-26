@@ -77,21 +77,66 @@ function getTargetWeightKg(workout: Workout, exercise: Workout['exercises'][numb
   return exercise.startWeightKg + exercise.overloadIncrementKg * workout.weeksCompleted;
 }
 
+function getMostRecentWorkoutSession(workout: Workout): Workout['sessions'][number] | null {
+  if (workout.sessions.length === 0) {
+    return null;
+  }
+
+  return workout.sessions.reduce((latestSession, session) =>
+    session.performedAt > latestSession.performedAt ? session : latestSession
+  );
+}
+
+function getSessionSetIdLookupKey(workoutExerciseId: string, setNumber: number): string {
+  return `${workoutExerciseId}:${setNumber}`;
+}
+
+function getSessionSetNameLookupKey(exerciseName: string, setNumber: number): string {
+  return `${exerciseName.trim().toLowerCase()}:${setNumber}`;
+}
+
 function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
+  const mostRecentSession = getMostRecentWorkoutSession(workout);
+  const lastSessionWeightByExerciseSet = new Map<string, number>();
+  const lastSessionWeightByExerciseNameSet = new Map<string, number>();
+
+  mostRecentSession?.sets.forEach((setEntry) => {
+    if (!Number.isFinite(setEntry.weightKg)) {
+      return;
+    }
+
+    lastSessionWeightByExerciseSet.set(
+      getSessionSetIdLookupKey(setEntry.workoutExerciseId, setEntry.setNumber),
+      setEntry.weightKg
+    );
+    lastSessionWeightByExerciseNameSet.set(
+      getSessionSetNameLookupKey(setEntry.exerciseName, setEntry.setNumber),
+      setEntry.weightKg
+    );
+  });
+
   return workout.exercises.flatMap((exercise) => {
     const targetWeightKg = getTargetWeightKg(workout, exercise);
 
-    return Array.from({ length: exercise.sets }, (_, index) => ({
-      id: createId('active_set'),
-      workoutExerciseId: exercise.id,
-      exerciseName: exercise.name,
-      setNumber: index + 1,
-      targetReps: exercise.reps,
-      targetWeightKg,
-      actualWeightKg: targetWeightKg,
-      restSeconds: exercise.restSeconds,
-      actualReps: 0,
-    }));
+    return Array.from({ length: exercise.sets }, (_, index) => {
+      const setNumber = index + 1;
+      const actualWeightKg =
+        lastSessionWeightByExerciseSet.get(getSessionSetIdLookupKey(exercise.id, setNumber)) ??
+        lastSessionWeightByExerciseNameSet.get(getSessionSetNameLookupKey(exercise.name, setNumber)) ??
+        targetWeightKg;
+
+      return {
+        id: createId('active_set'),
+        workoutExerciseId: exercise.id,
+        exerciseName: exercise.name,
+        setNumber,
+        targetReps: exercise.reps,
+        targetWeightKg,
+        actualWeightKg,
+        restSeconds: exercise.restSeconds,
+        actualReps: 0,
+      };
+    });
   });
 }
 

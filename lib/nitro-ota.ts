@@ -189,6 +189,15 @@ function createOtaManager(): {
   }
 }
 
+function isNotFoundResponse(value: string | null | undefined): boolean {
+  if (!value) {
+    return false;
+  }
+
+  const normalized = value.toLowerCase();
+  return normalized.includes("404") || normalized.includes("not found");
+}
+
 export function getNitroOtaSnapshot(): NitroOtaSnapshot {
   const binaryAppVersion = getBinaryAppVersion();
   const config = getRuntimeConfig();
@@ -249,7 +258,23 @@ export async function checkNitroOtaForUpdates(): Promise<NitroOtaUpdateCheck | n
     return null;
   }
 
-  return context.manager.checkForUpdatesJS(getBinaryAppVersion());
+  const result = await context.manager.checkForUpdatesJS(getBinaryAppVersion());
+
+  if (!result) {
+    return null;
+  }
+
+  if (isNotFoundResponse(result.remoteVersion)) {
+    return {
+      ...result,
+      hasUpdate: false,
+      isCompatible: false,
+      remoteVersion:
+        context.manager.getVersion() ?? getBinaryAppVersion(),
+    };
+  }
+
+  return result;
 }
 
 export async function downloadNitroOtaUpdate(

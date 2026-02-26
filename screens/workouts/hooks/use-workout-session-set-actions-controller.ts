@@ -285,10 +285,6 @@ export function useWorkoutSessionSetActionsController({
       }
 
       triggerSelectionHaptic();
-
-      if (activeRestTimer?.setId === setEntry.id) {
-        await clearRestTimer();
-      }
     } catch {
       setSessionActionError("Could not update this set right now.");
     }

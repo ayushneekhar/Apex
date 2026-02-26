@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 
@@ -71,7 +77,9 @@ const outputDir = resolve(
   projectRoot,
   args["output-dir"] || `.artifacts/nitro-ota/${platform}`
 );
-const bundleDir = resolve(outputDir, "App-Bundles");
+// Nitro OTA Android loader expects the JS bundle at the snapshot root (or one folder deep in the GitHub zip).
+// Keep the bundle and exported assets at the OTA snapshot root so the GitHub branch ZIP layout stays compatible.
+const bundleDir = outputDir;
 const bundleName =
   platform === "ios" ? "main.jsbundle" : "index.android.bundle";
 const bundleOutput = resolve(bundleDir, bundleName);
@@ -104,6 +112,11 @@ const bundleResult = spawnSync(process.execPath, expoArgs, {
 
 if (bundleResult.status !== 0) {
   process.exit(bundleResult.status ?? 1);
+}
+
+if (!existsSync(bundleOutput)) {
+  console.error(`Expected OTA bundle was not generated at: ${bundleOutput}`);
+  process.exit(1);
 }
 
 const versionManifest = {

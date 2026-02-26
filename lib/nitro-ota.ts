@@ -1,4 +1,5 @@
 import Constants from "expo-constants";
+import { File as FsFile, Paths } from "expo-file-system";
 import { Platform } from "react-native";
 
 type NitroOtaModule = typeof import("react-native-nitro-ota");
@@ -41,8 +42,19 @@ export type NitroOtaRollbackRecord = Parameters<
   ? T
   : never;
 
+export type NitroOtaStartupRecoveryStatus = {
+  reason: string;
+  message: string;
+  otaVersion: string | null;
+  previousOtaVersion: string | null;
+  missingBundlePath: string | null;
+  bundleName: string | null;
+  detectedAtMs: number | null;
+};
+
 const DEFAULT_GITHUB_URL = "https://github.com/ayushneekhar/Apex";
 const DEFAULT_VERSION_PATH = "ota.version.json";
+const STARTUP_RECOVERY_STATUS_FILENAME = "nitro-ota-startup-recovery.json";
 const DEFAULT_REFS: Record<NativePlatform, string> = {
   ios: "nitro-ota-ios-production",
   android: "nitro-ota-android-production",
@@ -330,4 +342,59 @@ export function subscribeNitroOtaRollbacks(
   }
 
   return module.onRollback(callback);
+}
+
+function getStartupRecoveryStatusFile(): FsFile {
+  return new FsFile(Paths.document, STARTUP_RECOVERY_STATUS_FILENAME);
+}
+
+function toNullableString(value: unknown): string | null {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function toNullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export async function getNitroOtaStartupRecoveryStatus(): Promise<NitroOtaStartupRecoveryStatus | null> {
+  try {
+    const file = getStartupRecoveryStatusFile();
+    if (!file.exists) {
+      return null;
+    }
+
+    const raw = JSON.parse(await file.text()) as Record<string, unknown>;
+    const reason = toNullableString(raw.reason);
+    const message = toNullableString(raw.message);
+
+    if (!reason || !message) {
+      return null;
+    }
+
+    return {
+      reason,
+      message,
+      otaVersion: toNullableString(raw.otaVersion),
+      previousOtaVersion: toNullableString(raw.previousOtaVersion),
+      missingBundlePath: toNullableString(raw.missingBundlePath),
+      bundleName: toNullableString(raw.bundleName),
+      detectedAtMs: toNullableNumber(raw.detectedAtMs),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function clearNitroOtaStartupRecoveryStatus(): boolean {
+  try {
+    const file = getStartupRecoveryStatusFile();
+    if (!file.exists) {
+      return false;
+    }
+
+    file.delete();
+    return true;
+  } catch {
+    return false;
+  }
 }

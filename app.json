@@ -23,7 +23,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.Apex",
-      "versionCode": 1
+      "versionCode": 3
     },
     "web": {
       "output": "static",

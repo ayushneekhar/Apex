@@ -8,7 +8,13 @@ import { NeonGridBackground } from "@/components/ui/neon-grid-background";
 import { THEME_OPTIONS } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
 import { useAppTheme } from "@/hooks/use-app-theme";
-import { checkNitroOtaForUpdates, getNitroOtaSnapshot } from "@/lib/nitro-ota";
+import {
+  checkNitroOtaForUpdates,
+  clearNitroOtaStartupRecoveryStatus,
+  getNitroOtaSnapshot,
+  getNitroOtaStartupRecoveryStatus,
+  type NitroOtaStartupRecoveryStatus,
+} from "@/lib/nitro-ota";
 import {
   connectSpotify,
   disconnectSpotify,
@@ -40,6 +46,8 @@ export default function SettingsScreen() {
   const [nitroOtaSnapshot, setNitroOtaSnapshot] = useState(() =>
     getNitroOtaSnapshot()
   );
+  const [nitroOtaStartupRecovery, setNitroOtaStartupRecovery] =
+    useState<NitroOtaStartupRecoveryStatus | null>(null);
 
   const spotifyConfigured = isSpotifyConfigured();
 
@@ -82,6 +90,22 @@ export default function SettingsScreen() {
   useEffect(() => {
     void refreshSpotifyStatus();
   }, [refreshSpotifyStatus]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    void getNitroOtaStartupRecoveryStatus().then((status) => {
+      if (!mounted) {
+        return;
+      }
+
+      setNitroOtaStartupRecovery(status);
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleCheckForUpdates = useCallback(async () => {
     setUpdateBusy(true);
@@ -530,6 +554,40 @@ export default function SettingsScreen() {
 
           {backupStatus ? <AppText tone="muted">{backupStatus}</AppText> : null}
         </View>
+
+        {nitroOtaStartupRecovery ? (
+          <View
+            style={[
+              styles.card,
+              {
+                borderColor: theme.palette.border,
+                backgroundColor: theme.palette.panel,
+              },
+            ]}
+          >
+            <AppText variant="heading">OTA Update Failed</AppText>
+            <AppText tone="muted">
+              {nitroOtaStartupRecovery.otaVersion
+                ? `OTA ${nitroOtaStartupRecovery.otaVersion} could not be loaded on startup.`
+                : "A downloaded OTA update could not be loaded on startup."}
+            </AppText>
+            <AppText tone="muted">
+              Nitro OTA cache was cleared automatically and the app fell back to
+              the embedded bundle.
+            </AppText>
+
+            <View style={styles.backupActions}>
+              <NeonButton
+                title="Dismiss"
+                variant="ghost"
+                onPress={() => {
+                  clearNitroOtaStartupRecoveryStatus();
+                  setNitroOtaStartupRecovery(null);
+                }}
+              />
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.versionContainer}>
           <AppText variant="micro" tone="muted">

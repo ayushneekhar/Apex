@@ -12,7 +12,9 @@
     "android:standalone:install": "cd android && ./gradlew installRelease",
     "ios": "expo run:ios",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "nitro-ota:build": "node scripts/ota/build-nitro-ota.mjs",
+    "version:app:bump": "node scripts/version/bump-app-version.mjs"
   },
   "dependencies": {
     "@expo-google-fonts/unbounded": "^0.4.1",
@@ -40,6 +42,7 @@
     "react-native-keyboard-controller": "^1.20.7",
     "react-native-nitro-haptics": "^0.2.1",
     "react-native-nitro-modules": "^0.33.9",
+    "react-native-nitro-ota": "^0.11.0",
     "react-native-reanimated": "~4.1.1",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",

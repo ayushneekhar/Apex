@@ -152,6 +152,33 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - NitroOta (0.11.0):
+    - hermes-engine
+    - NitroModules
+    - NitroOtaBundleManager (= 0.11.0)
+    - RCTRequired
+    - RCTTypeSafety
+    - React-callinvoker
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - SSZipArchive
+    - Yoga
+  - NitroOtaBundleManager (0.11.0)
   - RCTDeprecation (0.81.5)
   - RCTRequired (0.81.5)
   - RCTTypeSafety (0.81.5):
@@ -2165,6 +2192,7 @@ PODS:
   - SDWebImageWebPCoder (0.14.6):
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
+  - SSZipArchive (2.4.3)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2190,6 +2218,8 @@ DEPENDENCIES:
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - NitroHaptics (from `../node_modules/react-native-nitro-haptics`)
   - NitroModules (from `../node_modules/react-native-nitro-modules`)
+  - NitroOta (from `../node_modules/react-native-nitro-ota`)
+  - NitroOtaBundleManager (from `../node_modules/react-native-nitro-ota`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../node_modules/react-native/Libraries/Required`)
   - RCTTypeSafety (from `../node_modules/react-native/Libraries/TypeSafety`)
@@ -2273,6 +2303,7 @@ SPEC REPOS:
     - SDWebImageAVIFCoder
     - SDWebImageSVGCoder
     - SDWebImageWebPCoder
+    - SSZipArchive
 
 EXTERNAL SOURCES:
   EXApplication:
@@ -2320,6 +2351,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-nitro-haptics"
   NitroModules:
     :path: "../node_modules/react-native-nitro-modules"
+  NitroOta:
+    :path: "../node_modules/react-native-nitro-ota"
+  NitroOtaBundleManager:
+    :path: "../node_modules/react-native-nitro-ota"
   RCTDeprecation:
     :path: "../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2491,6 +2526,8 @@ SPEC CHECKSUMS:
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   NitroHaptics: 04e13d71070c927d3187ddb1b4d74198e8ade07e
   NitroModules: 475e9212530136851c48d04f458b0d33d4d21da1
+  NitroOta: 130f60aa8da5c52d391512b776aa5aa40fd2c989
+  NitroOtaBundleManager: 4b9c1669d0dc7d594f3f82becdd20b213bfbe567
   RCTDeprecation: 943572d4be82d480a48f4884f670135ae30bf990
   RCTRequired: 8f3cfc90cc25cf6e420ddb3e7caaaabc57df6043
   RCTTypeSafety: 16a4144ca3f959583ab019b57d5633df10b5e97c
@@ -2566,8 +2603,9 @@ SPEC CHECKSUMS:
   SDWebImageAVIFCoder: afe194a084e851f70228e4be35ef651df0fc5c57
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
+  SSZipArchive: fe6a26b2a54d5a0890f2567b5cc6de5caa600aef
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
-PODFILE CHECKSUM: b5b5ca50f14c8f3c76fea8ed31333d445293b0a0
+PODFILE CHECKSUM: ac6f6edc602dbdb1a6864dccd92c37ca98e95e0e
 
 COCOAPODS: 1.16.2

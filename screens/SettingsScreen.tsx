@@ -9,6 +9,14 @@ import { THEME_OPTIONS } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import {
+  checkNitroOtaForUpdates,
+  downloadNitroOtaUpdate,
+  getNitroOtaSnapshot,
+  reloadNitroOtaApp,
+  rollbackNitroOtaToPreviousBundle,
+  type NitroOtaUpdateCheck,
+} from "@/lib/nitro-ota";
+import {
   connectSpotify,
   disconnectSpotify,
   isSpotifyConfigured,
@@ -34,6 +42,14 @@ export default function SettingsScreen() {
   const [spotifyBusy, setSpotifyBusy] = useState(false);
   const [spotifyError, setSpotifyError] = useState<string | null>(null);
   const [spotifyStatus, setSpotifyStatus] = useState<string | null>(null);
+  const [nitroOtaSnapshot, setNitroOtaSnapshot] = useState(() =>
+    getNitroOtaSnapshot()
+  );
+  const [nitroOtaBusy, setNitroOtaBusy] = useState(false);
+  const [nitroOtaStatus, setNitroOtaStatus] = useState<string | null>(null);
+  const [nitroOtaProgress, setNitroOtaProgress] = useState<number | null>(null);
+  const [nitroOtaCheck, setNitroOtaCheck] =
+    useState<NitroOtaUpdateCheck | null>(null);
 
   const spotifyConfigured = isSpotifyConfigured();
 
@@ -76,6 +92,177 @@ export default function SettingsScreen() {
   useEffect(() => {
     void refreshSpotifyStatus();
   }, [refreshSpotifyStatus]);
+
+  const refreshNitroOtaSnapshot = useCallback(() => {
+    setNitroOtaSnapshot(getNitroOtaSnapshot());
+  }, []);
+
+  const handleCheckNitroOta = useCallback(async () => {
+    setNitroOtaBusy(true);
+    setNitroOtaStatus(null);
+
+    try {
+      const result = await checkNitroOtaForUpdates();
+      refreshNitroOtaSnapshot();
+      setNitroOtaCheck(result);
+
+      if (!result) {
+        setNitroOtaStatus(
+          nitroOtaSnapshot.enabled
+            ? "Nitro OTA check is not available on this build."
+            : nitroOtaSnapshot.disabledReason ?? "Nitro OTA is not configured."
+        );
+        return;
+      }
+
+      if (!result.hasUpdate) {
+        setNitroOtaStatus("No OTA update available.");
+        return;
+      }
+
+      if (!result.isCompatible) {
+        setNitroOtaStatus(
+          `Update ${result.remoteVersion} is available but not compatible with app version ${nitroOtaSnapshot.binaryAppVersion}.`
+        );
+        return;
+      }
+
+      setNitroOtaStatus(
+        `Compatible update ${result.remoteVersion} is available.`
+      );
+    } catch (error) {
+      setNitroOtaStatus(
+        error instanceof Error ? error.message : "Failed to check Nitro OTA."
+      );
+    } finally {
+      setNitroOtaBusy(false);
+    }
+  }, [
+    nitroOtaSnapshot.binaryAppVersion,
+    nitroOtaSnapshot.disabledReason,
+    nitroOtaSnapshot.enabled,
+    refreshNitroOtaSnapshot,
+  ]);
+
+  const handleDownloadNitroOta = useCallback(async () => {
+    if (!nitroOtaSnapshot.enabled) {
+      Alert.alert(
+        "Nitro OTA not configured",
+        nitroOtaSnapshot.disabledReason ?? "Configure Nitro OTA first."
+      );
+      return;
+    }
+
+    setNitroOtaBusy(true);
+    setNitroOtaProgress(0);
+    setNitroOtaStatus("Checking for updates...");
+
+    try {
+      const checkResult = await checkNitroOtaForUpdates();
+      setNitroOtaCheck(checkResult);
+
+      if (!checkResult?.hasUpdate) {
+        setNitroOtaStatus("No OTA update available.");
+        return;
+      }
+
+      if (!checkResult.isCompatible) {
+        setNitroOtaStatus(
+          `Update ${checkResult.remoteVersion} is not compatible with app version ${nitroOtaSnapshot.binaryAppVersion}.`
+        );
+        return;
+      }
+
+      setNitroOtaStatus(`Downloading OTA ${checkResult.remoteVersion}...`);
+
+      await downloadNitroOtaUpdate((received, total) => {
+        if (total > 0) {
+          setNitroOtaProgress(received / total);
+          return;
+        }
+
+        setNitroOtaProgress(null);
+      });
+
+      refreshNitroOtaSnapshot();
+      setNitroOtaStatus(
+        `OTA ${checkResult.remoteVersion} downloaded. Restart the app to apply it.`
+      );
+      setNitroOtaProgress(1);
+
+      Alert.alert(
+        "Nitro OTA Ready",
+        "Restart the app now to apply the update?",
+        [
+          {
+            text: "Later",
+            style: "cancel",
+          },
+          {
+            text: "Restart",
+            onPress: () => {
+              reloadNitroOtaApp();
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      setNitroOtaProgress(null);
+      setNitroOtaStatus(
+        error instanceof Error ? error.message : "Failed to download Nitro OTA."
+      );
+    } finally {
+      setNitroOtaBusy(false);
+    }
+  }, [
+    nitroOtaSnapshot.binaryAppVersion,
+    nitroOtaSnapshot.disabledReason,
+    nitroOtaSnapshot.enabled,
+    refreshNitroOtaSnapshot,
+  ]);
+
+  const handleRollbackNitroOta = useCallback(async () => {
+    if (!nitroOtaSnapshot.currentOtaVersion) {
+      setNitroOtaStatus("No active OTA bundle to roll back.");
+      return;
+    }
+
+    setNitroOtaBusy(true);
+    setNitroOtaStatus("Rolling back OTA bundle...");
+
+    try {
+      const rolledBack = await rollbackNitroOtaToPreviousBundle();
+      refreshNitroOtaSnapshot();
+
+      if (!rolledBack) {
+        setNitroOtaStatus("Rollback was not applied.");
+        return;
+      }
+
+      setNitroOtaStatus("Rollback applied. Restart the app to finish.");
+      Alert.alert("Rollback ready", "Restart the app now to apply rollback?", [
+        {
+          text: "Later",
+          style: "cancel",
+        },
+        {
+          text: "Restart",
+          style: "destructive",
+          onPress: () => {
+            reloadNitroOtaApp();
+          },
+        },
+      ]);
+    } catch (error) {
+      setNitroOtaStatus(
+        error instanceof Error
+          ? error.message
+          : "Failed to roll back Nitro OTA."
+      );
+    } finally {
+      setNitroOtaBusy(false);
+    }
+  }, [nitroOtaSnapshot.currentOtaVersion, refreshNitroOtaSnapshot]);
 
   const handleExportBackup = async () => {
     try {
@@ -425,6 +612,138 @@ export default function SettingsScreen() {
               }
             >
               {spotifyStatus}
+            </AppText>
+          ) : null}
+        </View>
+
+        <View
+          style={[
+            styles.card,
+            {
+              borderColor: theme.palette.border,
+              backgroundColor: theme.palette.panel,
+            },
+          ]}
+        >
+          <AppText variant="heading">Nitro OTA</AppText>
+          <AppText tone="muted">
+            Check, download, and apply React Native Nitro OTA updates published
+            from your configured GitHub branch.
+          </AppText>
+
+          <View style={styles.infoList}>
+            <View
+              style={[
+                styles.infoRow,
+                {
+                  borderColor: theme.palette.border,
+                  backgroundColor: theme.palette.panelSoft,
+                },
+              ]}
+            >
+              <AppText variant="micro" tone="muted">
+                Binary version
+              </AppText>
+              <AppText>{nitroOtaSnapshot.binaryAppVersion}</AppText>
+            </View>
+
+            <View
+              style={[
+                styles.infoRow,
+                {
+                  borderColor: theme.palette.border,
+                  backgroundColor: theme.palette.panelSoft,
+                },
+              ]}
+            >
+              <AppText variant="micro" tone="muted">
+                OTA branch
+              </AppText>
+              <AppText>
+                {nitroOtaSnapshot.ref ??
+                  (nitroOtaSnapshot.enabled ? "Unknown" : "Disabled")}
+              </AppText>
+            </View>
+
+            <View
+              style={[
+                styles.infoRow,
+                {
+                  borderColor: theme.palette.border,
+                  backgroundColor: theme.palette.panelSoft,
+                },
+              ]}
+            >
+              <AppText variant="micro" tone="muted">
+                Active OTA
+              </AppText>
+              <AppText>{nitroOtaSnapshot.currentOtaVersion ?? "None"}</AppText>
+            </View>
+          </View>
+
+          <View style={styles.backupActions}>
+            <NeonButton
+              title={nitroOtaBusy ? "Working..." : "Check for OTA Update"}
+              onPress={() => {
+                void handleCheckNitroOta();
+              }}
+              disabled={nitroOtaBusy || !nitroOtaSnapshot.enabled}
+            />
+            <NeonButton
+              title={nitroOtaBusy ? "Working..." : "Download & Apply OTA"}
+              onPress={() => {
+                void handleDownloadNitroOta();
+              }}
+              disabled={nitroOtaBusy || !nitroOtaSnapshot.enabled}
+            />
+            <NeonButton
+              title="Restart App"
+              variant="ghost"
+              onPress={reloadNitroOtaApp}
+              disabled={!nitroOtaSnapshot.enabled}
+            />
+            <NeonButton
+              title={nitroOtaBusy ? "Working..." : "Rollback OTA"}
+              variant="danger"
+              onPress={() => {
+                void handleRollbackNitroOta();
+              }}
+              disabled={nitroOtaBusy || !nitroOtaSnapshot.currentOtaVersion}
+            />
+          </View>
+
+          {nitroOtaProgress !== null ? (
+            <AppText tone="muted">
+              Download progress: {Math.round(nitroOtaProgress * 100)}%
+            </AppText>
+          ) : null}
+
+          {nitroOtaCheck ? (
+            <AppText
+              tone={
+                nitroOtaCheck.hasUpdate
+                  ? nitroOtaCheck.isCompatible
+                    ? "success"
+                    : "danger"
+                  : "muted"
+              }
+            >
+              Latest OTA: {nitroOtaCheck.remoteVersion}
+              {nitroOtaCheck.metadata?.releaseNotes
+                ? ` (${nitroOtaCheck.metadata.releaseNotes})`
+                : ""}
+            </AppText>
+          ) : null}
+
+          {nitroOtaStatus ? (
+            <AppText tone={nitroOtaSnapshot.enabled ? "muted" : "danger"}>
+              {nitroOtaStatus}
+            </AppText>
+          ) : null}
+          {!nitroOtaStatus && !nitroOtaSnapshot.enabled ? (
+            <AppText tone="danger">
+              {nitroOtaSnapshot.disabledReason ??
+                "Nitro OTA is not configured for this build."}
             </AppText>
           ) : null}
         </View>

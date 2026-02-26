@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Apex"
+      "bundleIdentifier": "com.anonymous.Apex",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +22,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.Apex"
+      "package": "com.anonymous.Apex",
+      "versionCode": 1
     },
     "web": {
       "output": "static",
@@ -42,8 +44,19 @@
       ],
       "expo-sqlite",
       "expo-notifications",
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-nitro-ota"
     ],
+    "extra": {
+      "nitroOta": {
+        "githubUrl": "https://github.com/ayushneekhar/Apex",
+        "versionPath": "ota.version.json",
+        "refs": {
+          "ios": "nitro-ota-ios-production",
+          "android": "nitro-ota-android-production"
+        }
+      }
+    },
     "experiments": {
       "reactCompiler": true
     }

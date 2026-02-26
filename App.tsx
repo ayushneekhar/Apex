@@ -31,6 +31,10 @@ import AnalyticsScreen from "@/screens/AnalyticsScreen";
 import HistoryScreen from "@/screens/HistoryScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import WorkoutsScreen from "@/screens/WorkoutsScreen";
+import {
+  confirmNitroOtaBundleIfAvailable,
+  subscribeNitroOtaRollbacks,
+} from "@/lib/nitro-ota";
 import { useAppStore } from "@/store/use-app-store";
 
 void SplashScreen.preventAutoHideAsync();
@@ -112,7 +116,21 @@ export default function App() {
     void bootstrap();
   }, [bootstrap]);
 
+  useEffect(() => {
+    return subscribeNitroOtaRollbacks((record) => {
+      console.warn("Nitro OTA rollback", record);
+    });
+  }, []);
+
   const appReady = fontsLoaded && (hydrated || Boolean(bootstrapError));
+
+  useEffect(() => {
+    if (!appReady) {
+      return;
+    }
+
+    confirmNitroOtaBundleIfAvailable();
+  }, [appReady]);
 
   useEffect(() => {
     if (!appReady) {

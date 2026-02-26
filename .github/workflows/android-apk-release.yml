@@ -1,0 +1,101 @@
+name: Android APK Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if yarn --version | grep -q '^1\.'; then
+            yarn install --frozen-lockfile
+          else
+            yarn install --immutable
+          fi
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x android/gradlew
+
+      - name: Build release APK
+        run: yarn android:apk:release
+
+      - name: Locate APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK_PATH="$(find android/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          if [ -z "${APK_PATH}" ]; then
+            echo "No APK found in android/app/build/outputs/apk/release" >&2
+            exit 1
+          fi
+          echo "path=${APK_PATH}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "${APK_PATH}")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: apex-android-apk-release-${{ github.run_number }}
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Post ntfy notification
+        shell: bash
+        env:
+          NTFY_CHANNEL: apex-builds
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          APK_FILE: ${{ steps.apk.outputs.name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_SHA: ${{ github.sha }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${COMMIT_SHA::7}"
+          MESSAGE=$(cat <<EOF
+          Apex Android APK build ready
+          File: ${APK_FILE}
+          Branch: ${REF_NAME}
+          Commit: ${SHORT_SHA}
+          Download: ${ARTIFACT_URL}
+          Run: ${RUN_URL}
+          EOF
+          )
+
+          curl --fail --silent --show-error \
+            -H "Title: Apex APK Build" \
+            -H "Tags: android,package" \
+            -d "${MESSAGE}" \
+            "https://ntfy.sh/${NTFY_CHANNEL}"

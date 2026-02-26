@@ -675,8 +675,7 @@ export async function deleteWorkout(workoutId: string): Promise<void> {
 
 export async function exportDatabaseBackup(): Promise<string | null> {
   try {
-    const db = await getDatabase();
-    const serialized = await db.serializeAsync();
+    const serialized = await exportDatabaseBackupBytes();
     const destinationDirectory = await Directory.pickDirectoryAsync();
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -694,6 +693,11 @@ export async function exportDatabaseBackup(): Promise<string | null> {
 
     throw error;
   }
+}
+
+export async function exportDatabaseBackupBytes(): Promise<Uint8Array> {
+  const db = await getDatabase();
+  return db.serializeAsync();
 }
 
 type SqliteTableRow = {
@@ -717,18 +721,10 @@ async function assertValidBackupDatabase(db: SQLiteDatabase): Promise<void> {
   }
 }
 
-export async function importDatabaseBackup(): Promise<boolean> {
+export async function importDatabaseBackupBytes(bytes: Uint8Array): Promise<void> {
   let sourceDatabase: SQLiteDatabase | null = null;
 
   try {
-    const picked = await File.pickFileAsync();
-    const pickedFile = Array.isArray(picked) ? picked[0] : picked;
-
-    if (!pickedFile) {
-      return false;
-    }
-
-    const bytes = await pickedFile.bytes();
     if (bytes.length === 0) {
       throw new Error('Selected backup file is empty.');
     }
@@ -741,6 +737,24 @@ export async function importDatabaseBackup(): Promise<boolean> {
       sourceDatabase,
       destDatabase: destinationDatabase,
     });
+  } finally {
+    if (sourceDatabase) {
+      await sourceDatabase.closeAsync();
+    }
+  }
+}
+
+export async function importDatabaseBackup(): Promise<boolean> {
+  try {
+    const picked = await File.pickFileAsync();
+    const pickedFile = Array.isArray(picked) ? picked[0] : picked;
+
+    if (!pickedFile) {
+      return false;
+    }
+
+    const bytes = await pickedFile.bytes();
+    await importDatabaseBackupBytes(bytes);
 
     return true;
   } catch (error) {
@@ -749,9 +763,5 @@ export async function importDatabaseBackup(): Promise<boolean> {
     }
 
     throw error;
-  } finally {
-    if (sourceDatabase) {
-      await sourceDatabase.closeAsync();
-    }
   }
 }

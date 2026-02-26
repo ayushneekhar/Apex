@@ -23,6 +23,7 @@ import {
 } from "@/lib/spotify";
 import { formatWeightFromKg, getDefaultWeeklyIncrementKg } from "@/lib/weight";
 import { useAppStore } from "@/store/use-app-store";
+import BackupCenterScreen from "./BackupCenterScreen";
 import { styles } from "./SettingsScreen.styles";
 
 export default function SettingsScreen() {
@@ -31,15 +32,12 @@ export default function SettingsScreen() {
   const { layout, opacity } = designTokens;
 
   const settings = useAppStore((state) => state.settings);
-  const mutating = useAppStore((state) => state.mutating);
-  const exportBackup = useAppStore((state) => state.exportBackup);
-  const importBackup = useAppStore((state) => state.importBackup);
   const setTheme = useAppStore((state) => state.setTheme);
   const setWeightUnit = useAppStore((state) => state.setWeightUnit);
   const setNitroOtaUpdateCheck = useAppStore(
     (state) => state.setNitroOtaUpdateCheck
   );
-  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [showBackupCenter, setShowBackupCenter] = useState(false);
   const [spotifyConnected, setSpotifyConnected] = useState(false);
   const [spotifyBusy, setSpotifyBusy] = useState(false);
   const [spotifyError, setSpotifyError] = useState<string | null>(null);
@@ -150,68 +148,6 @@ export default function SettingsScreen() {
     }
   }, [setNitroOtaUpdateCheck]);
 
-  const handleExportBackup = async () => {
-    try {
-      const uri = await exportBackup();
-
-      if (!uri) {
-        setBackupStatus("Export cancelled.");
-        return;
-      }
-
-      setBackupStatus(`Backup exported: ${uri}`);
-      Alert.alert(
-        "Backup exported",
-        "Your workouts were exported to the selected location."
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to export backup.";
-      Alert.alert("Export failed", message);
-    }
-  };
-
-  const confirmImportBackup = async () => {
-    try {
-      const imported = await importBackup();
-
-      if (!imported) {
-        setBackupStatus("Import cancelled.");
-        return;
-      }
-
-      setBackupStatus("Backup imported successfully.");
-      Alert.alert(
-        "Backup imported",
-        "Your workouts and settings have been restored."
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to import backup.";
-      Alert.alert("Import failed", message);
-    }
-  };
-
-  const handleImportBackup = () => {
-    Alert.alert(
-      "Import backup?",
-      "Importing a backup will replace your current workouts and settings on this device.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Import",
-          style: "destructive",
-          onPress: () => {
-            void confirmImportBackup();
-          },
-        },
-      ]
-    );
-  };
-
   const handleConnectSpotify = async () => {
     if (!spotifyConfigured) {
       Alert.alert(
@@ -261,6 +197,16 @@ export default function SettingsScreen() {
       setSpotifyBusy(false);
     }
   };
+
+  if (showBackupCenter) {
+    return (
+      <BackupCenterScreen
+        onBack={() => {
+          setShowBackupCenter(false);
+        }}
+      />
+    );
+  }
 
   return (
     <View
@@ -540,27 +486,18 @@ export default function SettingsScreen() {
         >
           <AppText variant="heading">Backup & Restore</AppText>
           <AppText tone="muted">
-            Export your current SQLite workout data as a backup file, or import
-            a previously exported backup.
+            Open the backup center to manage manual backup files and Google
+            Drive backups.
           </AppText>
 
           <View style={styles.backupActions}>
             <NeonButton
-              title={mutating ? "Working..." : "Export Backup File"}
+              title="Open Backup Center"
               onPress={() => {
-                void handleExportBackup();
+                setShowBackupCenter(true);
               }}
-              disabled={mutating}
-            />
-            <NeonButton
-              title={mutating ? "Working..." : "Import Backup File"}
-              variant="ghost"
-              onPress={handleImportBackup}
-              disabled={mutating}
             />
           </View>
-
-          {backupStatus ? <AppText tone="muted">{backupStatus}</AppText> : null}
         </View>
 
         {nitroOtaStartupRecovery ? (

@@ -9,6 +9,7 @@ import {
   createWorkoutSession,
   deleteWorkout,
   exportDatabaseBackup,
+  importDatabaseBackupBytes,
   importDatabaseBackup,
   initializeDatabase,
   listWorkouts,
@@ -50,6 +51,7 @@ type AppStoreState = {
   refreshWorkouts: () => Promise<void>;
   exportBackup: () => Promise<string | null>;
   importBackup: () => Promise<boolean>;
+  importBackupFromBytes: (bytes: Uint8Array) => Promise<void>;
   setTheme: (themeId: ThemeId) => Promise<void>;
   setWeightUnit: (unit: WeightUnit) => Promise<void>;
   addWorkout: (input: NewWorkoutInput) => Promise<void>;
@@ -321,6 +323,25 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       });
 
       return true;
+    } catch (error) {
+      set({ error: errorMessage(error) });
+      throw error;
+    } finally {
+      set({ mutating: false });
+    }
+  },
+  importBackupFromBytes: async (bytes) => {
+    set({ mutating: true, error: null });
+
+    try {
+      await importDatabaseBackupBytes(bytes);
+      await initializeDatabase();
+      const persistedState = await loadPersistedState();
+
+      set({
+        ...persistedState,
+        error: null,
+      });
     } catch (error) {
       set({ error: errorMessage(error) });
       throw error;

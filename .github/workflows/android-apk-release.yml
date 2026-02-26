@@ -2,6 +2,23 @@ name: Android APK Release
 
 on:
   workflow_dispatch:
+    inputs:
+      build_environment:
+        description: GitHub Environment to load secrets/vars from
+        type: choice
+        required: true
+        default: development
+        options:
+          - development
+          - production
+      build_type:
+        description: APK flavor to build
+        type: choice
+        required: true
+        default: development
+        options:
+          - development
+          - production
 
 permissions:
   contents: read
@@ -14,6 +31,13 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    environment: ${{ inputs.build_environment }}
+    env:
+      EXPO_PUBLIC_SPOTIFY_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_SPOTIFY_CLIENT_ID }}
+      EXPO_PUBLIC_NITRO_OTA_GITHUB_URL: ${{ vars.EXPO_PUBLIC_NITRO_OTA_GITHUB_URL }}
+      EXPO_PUBLIC_NITRO_OTA_VERSION_PATH: ${{ vars.EXPO_PUBLIC_NITRO_OTA_VERSION_PATH }}
+      EXPO_PUBLIC_NITRO_OTA_ANDROID_REF: ${{ vars.EXPO_PUBLIC_NITRO_OTA_ANDROID_REF }}
+      EXPO_PUBLIC_NITRO_OTA_IOS_REF: ${{ vars.EXPO_PUBLIC_NITRO_OTA_IOS_REF }}
 
     steps:
       - name: Checkout repository
@@ -47,17 +71,42 @@ jobs:
       - name: Ensure Gradle wrapper is executable
         run: chmod +x android/gradlew
 
-      - name: Build release APK
-        run: yarn android:apk:release
+      - name: Validate required environment variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_PUBLIC_SPOTIFY_CLIENT_ID}" ]; then
+            echo "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID for '${{ inputs.build_environment }}' environment." >&2
+            exit 1
+          fi
+
+      - name: Build APK
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ inputs.build_type }}" = "production" ]; then
+            echo "Building production APK (assembleRelease)"
+            yarn android:apk:release
+          else
+            echo "Building development APK (assembleDebug)"
+            yarn android:apk:debug
+          fi
 
       - name: Locate APK
         id: apk
         shell: bash
         run: |
           set -euo pipefail
-          APK_PATH="$(find android/app/build/outputs/apk/release -type f -name '*.apk' | head -n 1)"
+          if [ "${{ inputs.build_type }}" = "production" ]; then
+            SEARCH_DIR="android/app/build/outputs/apk/release"
+          else
+            SEARCH_DIR="android/app/build/outputs/apk/debug"
+          fi
+
+          APK_PATH="$(find "${SEARCH_DIR}" -type f -name '*.apk' | head -n 1)"
           if [ -z "${APK_PATH}" ]; then
-            echo "No APK found in android/app/build/outputs/apk/release" >&2
+            echo "No APK found in ${SEARCH_DIR}" >&2
             exit 1
           fi
           echo "path=${APK_PATH}" >> "$GITHUB_OUTPUT"
@@ -67,7 +116,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: apex-android-apk-release-${{ github.run_number }}
+          name: apex-android-apk-${{ inputs.build_type }}-${{ github.run_number }}
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 14
@@ -81,11 +130,15 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_SHA: ${{ github.sha }}
           REF_NAME: ${{ github.ref_name }}
+          BUILD_TYPE: ${{ inputs.build_type }}
+          BUILD_ENVIRONMENT: ${{ inputs.build_environment }}
         run: |
           set -euo pipefail
           SHORT_SHA="${COMMIT_SHA::7}"
           MESSAGE=$(cat <<EOF
           Apex Android APK build ready
+          Build type: ${BUILD_TYPE}
+          Environment: ${BUILD_ENVIRONMENT}
           File: ${APK_FILE}
           Branch: ${REF_NAME}
           Commit: ${SHORT_SHA}

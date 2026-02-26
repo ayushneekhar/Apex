@@ -1,0 +1,10 @@
+{
+  "version": "1.0.1",
+  "isSemver": true,
+  "targetVersions": {
+    "android": [
+      "1.0.0"
+    ]
+  },
+  "releaseNotes": "Better codepush UX"
+}

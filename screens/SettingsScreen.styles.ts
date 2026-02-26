@@ -72,4 +72,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  versionContainer: {
+    alignItems: 'center',
+    gap: spacing.xxs,
+    paddingBottom: spacing.md,
+  },
 });

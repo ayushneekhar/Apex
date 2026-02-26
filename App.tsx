@@ -15,8 +15,8 @@ import {
 } from "@react-navigation/native";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useMemo } from "react";
-import { View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import {
@@ -25,16 +25,22 @@ import {
 } from "react-native-safe-area-context";
 
 import { createTabScreenOptions, styles } from "@/App.styles";
+import { AppText } from "@/components/ui/app-text";
 import type { AppTheme } from "@/constants/app-themes";
+import { designTokens } from "@/constants/design-system";
 import { useAppTheme } from "@/hooks/use-app-theme";
+import {
+  checkNitroOtaForUpdates,
+  confirmNitroOtaBundleIfAvailable,
+  downloadNitroOtaUpdate,
+  reloadNitroOtaApp,
+  subscribeNitroOtaRollbacks,
+  type NitroOtaUpdateCheck,
+} from "@/lib/nitro-ota";
 import AnalyticsScreen from "@/screens/AnalyticsScreen";
 import HistoryScreen from "@/screens/HistoryScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
 import WorkoutsScreen from "@/screens/WorkoutsScreen";
-import {
-  confirmNitroOtaBundleIfAvailable,
-  subscribeNitroOtaRollbacks,
-} from "@/lib/nitro-ota";
 import { useAppStore } from "@/store/use-app-store";
 
 void SplashScreen.preventAutoHideAsync();
@@ -67,11 +73,20 @@ const APP_TABS = [
 function RootTabs({
   navigationTheme,
   theme,
+  updateCheck,
+  updateBusy,
+  onDismissUpdate,
+  onApplyUpdate,
 }: {
   navigationTheme: Theme;
   theme: AppTheme;
+  updateCheck: NitroOtaUpdateCheck | null;
+  updateBusy: boolean;
+  onDismissUpdate: () => void;
+  onApplyUpdate: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const showUpdatePrompt = Boolean(updateCheck?.hasUpdate && updateCheck.isCompatible);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.palette.background }}>
@@ -94,6 +109,64 @@ function RootTabs({
             />
           ))}
         </Tab.Navigator>
+
+        {showUpdatePrompt ? (
+          <View
+            style={[
+              styles.updatePrompt,
+              {
+                left: designTokens.layout.screenHorizontalInset,
+                right: designTokens.layout.screenHorizontalInset,
+                bottom:
+                  insets.bottom +
+                  designTokens.sizes.tabBarBaseHeight +
+                  designTokens.spacing.md,
+                borderColor: theme.palette.border,
+                backgroundColor: theme.palette.panel,
+              },
+            ]}
+          >
+            <AppText variant="label">New App Update Available</AppText>
+            <AppText tone="muted">Would you like to update now?</AppText>
+            <View style={styles.updatePromptActions}>
+              <Pressable
+                onPress={onDismissUpdate}
+                style={({ pressed }) => [
+                  styles.updatePromptButton,
+                  {
+                    borderColor: theme.palette.border,
+                    opacity: pressed ? designTokens.opacity.pressedSoft : 1,
+                  },
+                ]}
+              >
+                <AppText variant="label" tone="muted">
+                  Later
+                </AppText>
+              </Pressable>
+              <Pressable
+                onPress={onApplyUpdate}
+                disabled={updateBusy}
+                style={({ pressed }) => [
+                  styles.updatePromptButton,
+                  {
+                    borderColor: theme.palette.accent,
+                    backgroundColor: theme.palette.accent,
+                    opacity: updateBusy
+                      ? designTokens.opacity.disabled
+                      : pressed
+                      ? designTokens.opacity.pressedSoft
+                      : 1,
+                  },
+                ]}
+              >
+                <AppText variant="label" tone="inverse">
+                  {updateBusy ? "Updating..." : "Update"}
+                </AppText>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
         <StatusBar style={theme.statusBarStyle} />
       </NavigationContainer>
     </View>
@@ -105,6 +178,8 @@ export default function App() {
   const bootstrapError = useAppStore((state) => state.error);
   const hydrated = useAppStore((state) => state.hydrated);
   const bootstrap = useAppStore((state) => state.bootstrap);
+  const [updateCheck, setUpdateCheck] = useState<NitroOtaUpdateCheck | null>(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Unbounded_400Regular,
@@ -140,6 +215,58 @@ export default function App() {
     void SplashScreen.hideAsync();
   }, [appReady]);
 
+  useEffect(() => {
+    if (!appReady) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const runInitialUpdateCheck = async () => {
+      try {
+        const result = await checkNitroOtaForUpdates();
+
+        if (!cancelled) {
+          setUpdateCheck(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setUpdateCheck(null);
+        }
+      }
+    };
+
+    void runInitialUpdateCheck();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [appReady]);
+
+  const handleDismissUpdate = useCallback(() => {
+    setUpdateCheck(null);
+  }, []);
+
+  const handleApplyUpdate = useCallback(async () => {
+    setUpdateBusy(true);
+
+    try {
+      const result = await checkNitroOtaForUpdates();
+
+      if (!result?.hasUpdate || !result.isCompatible) {
+        setUpdateCheck(null);
+        return;
+      }
+
+      await downloadNitroOtaUpdate();
+      reloadNitroOtaApp();
+    } catch {
+      // No-op. Keep prompt available so the user can retry.
+    } finally {
+      setUpdateBusy(false);
+    }
+  }, []);
+
   const navigationTheme = useMemo<Theme>(() => {
     return {
       ...DarkTheme,
@@ -165,7 +292,16 @@ export default function App() {
     >
       <KeyboardProvider>
         <SafeAreaProvider>
-          <RootTabs navigationTheme={navigationTheme} theme={theme} />
+          <RootTabs
+            navigationTheme={navigationTheme}
+            theme={theme}
+            updateCheck={updateCheck}
+            updateBusy={updateBusy}
+            onDismissUpdate={handleDismissUpdate}
+            onApplyUpdate={() => {
+              void handleApplyUpdate();
+            }}
+          />
         </SafeAreaProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>

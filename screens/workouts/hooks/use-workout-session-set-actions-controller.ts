@@ -219,7 +219,6 @@ export function useWorkoutSessionSetActionsController({
         resolvedValues.reps,
         resolvedValues.weightKg
       );
-      triggerSuccessHaptic();
       closeCustomSetModal();
     } catch {
       setCustomSetError('Could not save set values. Try again.');
@@ -283,20 +282,16 @@ export function useWorkoutSessionSetActionsController({
         await startRestTimer(setEntry);
         return;
       }
-
-      triggerSelectionHaptic();
     } catch {
       setSessionActionError("Could not update this set right now.");
     }
   }
 
   function handleSetWeightPress(setEntry: ActiveWorkoutSet) {
-    triggerSelectionHaptic();
     openCustomSetModal(setEntry, "weight");
   }
 
   function handleSetLongPress(setEntry: ActiveWorkoutSet) {
-    triggerSelectionHaptic();
     openCustomSetModal(setEntry, "reps");
   }
 

@@ -29,6 +29,7 @@ import { AppText } from "@/components/ui/app-text";
 import type { AppTheme } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
 import { useAppTheme } from "@/hooks/use-app-theme";
+import { triggerSelectionHaptic } from "@/lib/haptics";
 import {
   checkNitroOtaForUpdates,
   confirmNitroOtaBundleIfAvailable,
@@ -52,21 +53,25 @@ const APP_TABS = [
     name: "Workouts",
     component: WorkoutsScreen,
     iconName: "barbell-outline" as const,
+    hapticOnPress: false,
   },
   {
     name: "History",
     component: HistoryScreen,
     iconName: "time-outline" as const,
+    hapticOnPress: true,
   },
   {
     name: "Analytics",
     component: AnalyticsScreen,
     iconName: "stats-chart-outline" as const,
+    hapticOnPress: true,
   },
   {
     name: "Settings",
     component: SettingsScreen,
     iconName: "settings-outline" as const,
+    hapticOnPress: true,
   },
 ] as const;
 
@@ -101,6 +106,13 @@ function RootTabs({
               key={screen.name}
               name={screen.name}
               component={screen.component}
+              listeners={
+                screen.hapticOnPress
+                  ? {
+                      tabPress: triggerSelectionHaptic,
+                    }
+                  : undefined
+              }
               options={{
                 tabBarIcon: ({ color, size }) => (
                   <Ionicons name={screen.iconName} size={size} color={color} />

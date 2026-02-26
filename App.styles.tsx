@@ -6,11 +6,31 @@ import type { EdgeInsets } from "react-native-safe-area-context";
 import type { AppTheme } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
 
-const { border, sizes, spacing, typography } = designTokens;
+const { border, radii, sizes, spacing, typography } = designTokens;
 
 export const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  updatePrompt: {
+    position: "absolute",
+    borderWidth: border.thin,
+    borderRadius: radii.panel,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  updatePromptActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  updatePromptButton: {
+    flex: 1,
+    minHeight: sizes.controlMinHeight,
+    borderRadius: radii.xl,
+    borderWidth: border.thin,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.md,
   },
 });
 

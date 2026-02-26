@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - ".github/workflows/**"
   workflow_dispatch:
     inputs:
       deployment_environment:
@@ -22,10 +24,6 @@ on:
         options:
           - android
           - ios
-      ota_version:
-        description: OTA version (prefer semver, e.g. 1.0.1)
-        required: true
-        type: string
       ota_branch:
         description: OTA branch to publish (defaults to nitro-ota-<platform>-<deployment_environment>)
         required: false
@@ -74,7 +72,6 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
           INPUT_DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
           INPUT_PLATFORM: ${{ inputs.platform }}
-          INPUT_OTA_VERSION: ${{ inputs.ota_version }}
           INPUT_TARGET_APP_VERSION: ${{ inputs.target_app_version }}
           INPUT_RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
@@ -93,19 +90,6 @@ jobs:
           APP_VERSION="$(node -p "require('./app.json').expo.version")"
           write_output "target_app_version" "${INPUT_TARGET_APP_VERSION:-$APP_VERSION}"
 
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            write_output "deployment_environment" "${INPUT_DEPLOYMENT_ENVIRONMENT}"
-            write_output "platforms_json" "[\"${INPUT_PLATFORM}\"]"
-            write_output "ota_version" "${INPUT_OTA_VERSION}"
-            write_output "release_notes" "${INPUT_RELEASE_NOTES}"
-            write_output "skip_reason" ""
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          write_output "deployment_environment" "production"
-          write_output "platforms_json" "[\"android\",\"ios\"]"
-
           if [[ "$APP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             MAJOR="${BASH_REMATCH[1]}"
             MINOR="${BASH_REMATCH[2]}"
@@ -115,6 +99,20 @@ jobs:
           fi
           PATCH_COMPONENT=$((RUN_NUMBER * 100 + RUN_ATTEMPT))
           OTA_VERSION="${MAJOR}.${MINOR}.${PATCH_COMPONENT}"
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            write_output "deployment_environment" "${INPUT_DEPLOYMENT_ENVIRONMENT}"
+            write_output "platforms_json" "[\"${INPUT_PLATFORM}\"]"
+            write_output "ota_version" "${OTA_VERSION}"
+            write_output "release_notes" "${INPUT_RELEASE_NOTES}"
+            write_output "skip_reason" ""
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          write_output "deployment_environment" "production"
+          write_output "platforms_json" "[\"android\",\"ios\"]"
+
           write_output "ota_version" "$OTA_VERSION"
           write_output "release_notes" "Auto OTA from main (${HEAD_SHA:0:7})"
 
@@ -137,7 +135,23 @@ jobs:
           fi
 
           CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
+          WORKFLOW_CHANGE_REGEX='^\.github/workflows/'
           NATIVE_CHANGE_REGEX='^(android/|ios/|app\.json$|app\.config\.(js|ts|json|mjs|cjs)$|package\.json$|yarn\.lock$|package-lock\.json$|pnpm-lock\.yaml$|bun\.lockb?$)'
+
+          if printf '%s\n' "$CHANGED_FILES" | grep -Eq "$WORKFLOW_CHANGE_REGEX"; then
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            write_output "skip_reason" "Workflow files changed in this push; skipping automatic Nitro OTA publish."
+            {
+              echo "## Nitro OTA Auto Publish Skipped"
+              echo "Workflow files changed between ${BASE_SHA:0:7} and ${HEAD_SHA:0:7}."
+              echo ""
+              echo "Changed files:"
+              echo '```'
+              printf '%s\n' "$CHANGED_FILES"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
           if printf '%s\n' "$CHANGED_FILES" | grep -Eq "$NATIVE_CHANGE_REGEX"; then
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
@@ -184,19 +198,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+          fetch-depth: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: yarn
+
+      - name: Validate required environment variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${EXPO_PUBLIC_SPOTIFY_CLIENT_ID}" ]; then
+            echo "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID for '${{ needs.prepare.outputs.deployment_environment }}' environment." >&2
+            exit 1
+          fi
 
       - name: Enable Corepack
         run: corepack enable
@@ -231,15 +248,6 @@ jobs:
 
           "${CMD[@]}"
 
-      - name: Validate required environment variables
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "${EXPO_PUBLIC_SPOTIFY_CLIENT_ID}" ]; then
-            echo "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID for '${{ needs.prepare.outputs.deployment_environment }}' environment." >&2
-            exit 1
-          fi
-
       - name: Resolve OTA branch
         id: branch
         shell: bash
@@ -254,6 +262,7 @@ jobs:
           echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
 
       - name: Upload built OTA artifact
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           name: nitro-ota-${{ matrix.platform }}-${{ needs.prepare.outputs.ota_version }}

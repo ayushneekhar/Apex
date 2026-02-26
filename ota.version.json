@@ -1,10 +1,9 @@
 {
-  "version": "1.0.301",
+  "version": "1.0.501",
   "isSemver": true,
   "targetVersions": {
     "android": [
       "1.0.0"
     ]
-  },
-  "releaseNotes": "Auto OTA from main (05f8c9a)"
+  }
 }

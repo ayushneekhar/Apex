@@ -58,6 +58,8 @@ Set these in each environment:
 #### Secret (Environment secret)
 
 - `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`
+- `EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID`
+- `EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID`
 
 > Set this under **Environment → Secrets and variables → Actions → Secrets**.
 
@@ -108,6 +110,6 @@ Behavior:
   - `nitro-ota-<platform>-production` for production
 - `deployment_environment` selects which environment secrets/variables are injected
 
-### 4) Why this fixes Spotify in CI
+### 4) Why this fixes OAuth envs in CI
 
-Spotify auth checks `process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID` at build/runtime. By storing this as an environment secret and selecting the matching GitHub Environment in workflow dispatch, CI gets the correct value for that build.
+Spotify and Google Drive auth check `process.env.EXPO_PUBLIC_*` values at bundle-build time. By storing these as environment secrets and selecting the matching GitHub Environment in workflow dispatch, CI and Nitro OTA builds get the correct values for that build.

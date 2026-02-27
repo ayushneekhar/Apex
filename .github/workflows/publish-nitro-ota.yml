@@ -189,6 +189,8 @@ jobs:
     environment: ${{ needs.prepare.outputs.deployment_environment }}
     env:
       EXPO_PUBLIC_SPOTIFY_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_SPOTIFY_CLIENT_ID }}
+      EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID }}
+      EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID }}
       EXPO_PUBLIC_NITRO_OTA_GITHUB_URL: ${{ vars.EXPO_PUBLIC_NITRO_OTA_GITHUB_URL }}
       EXPO_PUBLIC_NITRO_OTA_VERSION_PATH: ${{ vars.EXPO_PUBLIC_NITRO_OTA_VERSION_PATH }}
       EXPO_PUBLIC_NITRO_OTA_ANDROID_REF: ${{ vars.EXPO_PUBLIC_NITRO_OTA_ANDROID_REF }}
@@ -212,6 +214,14 @@ jobs:
           set -euo pipefail
           if [ -z "${EXPO_PUBLIC_SPOTIFY_CLIENT_ID}" ]; then
             echo "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID for '${{ needs.prepare.outputs.deployment_environment }}' environment." >&2
+            exit 1
+          fi
+          if [ "${{ matrix.platform }}" = "android" ] && [ -z "${EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID}" ]; then
+            echo "Missing EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID for '${{ needs.prepare.outputs.deployment_environment }}' environment." >&2
+            exit 1
+          fi
+          if [ "${{ matrix.platform }}" = "ios" ] && [ -z "${EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID}" ]; then
+            echo "Missing EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID for '${{ needs.prepare.outputs.deployment_environment }}' environment." >&2
             exit 1
           fi
 

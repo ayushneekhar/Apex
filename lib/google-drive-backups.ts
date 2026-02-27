@@ -1,4 +1,3 @@
-import * as Application from 'expo-application';
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
@@ -92,14 +91,6 @@ export function isGoogleDriveConfigured(): boolean {
 }
 
 export function getGoogleDriveRedirectUri(): string {
-  const applicationId = Application.applicationId?.trim();
-
-  if (applicationId) {
-    return AuthSession.makeRedirectUri({
-      native: `${applicationId}:/oauthredirect`,
-    });
-  }
-
   return AuthSession.makeRedirectUri({
     scheme: 'apex',
     path: 'google-drive-auth',

@@ -65,7 +65,12 @@ type AppStoreState = {
   pauseActiveWorkoutSession: () => Promise<void>;
   resumeActiveWorkoutSession: () => Promise<void>;
   decrementOrCompleteSessionSet: (setId: string) => Promise<void>;
-  setSessionSetCustomValues: (setId: string, reps: number, weightKg: number) => Promise<void>;
+  setSessionSetCustomValues: (
+    setId: string,
+    reps: number,
+    weightKg: number,
+    weightScope?: "current" | "remaining" | "all"
+  ) => Promise<void>;
   finishActiveWorkoutSession: () => Promise<void>;
   discardActiveWorkoutSession: () => Promise<void>;
 };
@@ -587,7 +592,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
   },
-  setSessionSetCustomValues: async (setId, reps, weightKg) => {
+  setSessionSetCustomValues: async (setId, reps, weightKg, weightScope = "current") => {
     const session = get().activeSession;
     if (!session) {
       return;
@@ -596,18 +601,50 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const normalizedReps = Math.max(0, Math.floor(reps));
     const normalizedWeightKg = Number.isFinite(weightKg) ? weightKg : 0;
 
+    const selectedSet = session.sets.find((setEntry) => setEntry.id === setId);
+
+    if (!selectedSet) {
+      return;
+    }
+
     let changed = false;
+    const shouldApplyWeight = (setEntry: ActiveWorkoutSet) => {
+      if (weightScope === "all") {
+        return setEntry.workoutExerciseId === selectedSet.workoutExerciseId;
+      }
+
+      if (weightScope === "remaining") {
+        return (
+          setEntry.workoutExerciseId === selectedSet.workoutExerciseId &&
+          setEntry.setNumber >= selectedSet.setNumber
+        );
+      }
+
+      return setEntry.id === setId;
+    };
+
     const nextSets = session.sets.map((setEntry) => {
-      if (setEntry.id !== setId) {
+      const isSelectedSet = setEntry.id === setId;
+      const applyWeight = shouldApplyWeight(setEntry);
+
+      if (!isSelectedSet && !applyWeight) {
         return setEntry;
       }
 
-      changed = true;
-      return {
+      const nextSet = {
         ...setEntry,
-        actualReps: normalizedReps,
-        actualWeightKg: normalizedWeightKg,
+        actualReps: isSelectedSet ? normalizedReps : setEntry.actualReps,
+        actualWeightKg: applyWeight ? normalizedWeightKg : setEntry.actualWeightKg,
       };
+
+      if (
+        nextSet.actualReps !== setEntry.actualReps ||
+        nextSet.actualWeightKg !== setEntry.actualWeightKg
+      ) {
+        changed = true;
+      }
+
+      return nextSet;
     });
 
     if (!changed) {

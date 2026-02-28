@@ -94,7 +94,12 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  restProgressRow: {
+    position: 'relative',
+    width: '100%',
+  },
   restProgressTrack: {
+    width: '100%',
     height: spacing.sm,
     borderWidth: border.thin,
     borderRadius: radii.pill,
@@ -103,6 +108,16 @@ export const styles = StyleSheet.create({
   restProgressFill: {
     height: '100%',
     borderRadius: radii.pill,
+  },
+  restOvertimeFill: {
+    position: 'absolute',
+    left: '100%',
+    top: 0,
+    marginLeft: spacing.xs,
+    height: spacing.sm,
+    minWidth: spacing.xxs,
+    borderRadius: radii.pill,
+    maxWidth: '100%',
   },
   sessionStatsRow: {
     flexDirection: 'row',

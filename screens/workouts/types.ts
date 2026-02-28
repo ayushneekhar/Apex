@@ -29,3 +29,5 @@ export type ActiveRestTimer = {
 };
 
 export type CustomSetEditMode = 'reps' | 'weight';
+
+export type CustomWeightApplyScope = 'current' | 'remaining' | 'all';

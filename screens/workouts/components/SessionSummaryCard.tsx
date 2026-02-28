@@ -215,7 +215,12 @@ export function SessionSummaryCard({
           style={[
             styles.restTimerCard,
             {
-              borderColor: controller.restIsComplete ? theme.palette.success : theme.palette.accent,
+              borderColor:
+                controller.restOvertimeMs > 0
+                  ? theme.palette.danger
+                  : controller.restIsComplete
+                    ? theme.palette.success
+                    : theme.palette.accent,
               backgroundColor: theme.palette.panelSoft,
             },
           ]}
@@ -224,27 +229,55 @@ export function SessionSummaryCard({
             <AppText variant="micro" tone="muted">
               Rest Timer
             </AppText>
-            <AppText variant="label" tone={controller.restIsComplete ? 'success' : 'accent'}>
-              {controller.restIsComplete ? 'Ready' : formatDuration(controller.restRemainingMs)}
+            <AppText
+              variant="label"
+              tone={
+                controller.restOvertimeMs > 0
+                  ? 'danger'
+                  : controller.restIsComplete
+                    ? 'success'
+                    : 'accent'
+              }
+            >
+              {controller.restIsComplete
+                ? controller.restOvertimeMs > 0
+                  ? `+${formatDuration(controller.restOvertimeMs)}`
+                  : 'Ready'
+                : formatDuration(controller.restRemainingMs)}
             </AppText>
           </View>
           <AppText tone="muted">
-            {controller.restIsComplete
-              ? `${controller.activeRestTimer.exerciseName}: go crush the next set.`
-              : `${controller.activeRestTimer.exerciseName}: recover now.`}
+            {controller.restOvertimeMs > 0
+              ? `${controller.activeRestTimer.exerciseName}: overtime rest.`
+              : controller.restIsComplete
+                ? `${controller.activeRestTimer.exerciseName}: go crush the next set.`
+                : `${controller.activeRestTimer.exerciseName}: recover now.`}
           </AppText>
-          <View style={[styles.restProgressTrack, { borderColor: theme.palette.border }]}>
-            <View
-              style={[
-                styles.restProgressFill,
-                {
-                  backgroundColor: controller.restIsComplete
-                    ? theme.palette.success
-                    : theme.palette.accent,
-                  width: `${Math.round(controller.restProgress * 100)}%`,
-                },
-              ]}
-            />
+          <View style={styles.restProgressRow}>
+            <View style={[styles.restProgressTrack, { borderColor: theme.palette.border }]}>
+              <View
+                style={[
+                  styles.restProgressFill,
+                  {
+                    backgroundColor: controller.restIsComplete
+                      ? theme.palette.success
+                      : theme.palette.accent,
+                    width: `${Math.round(controller.restProgress * 100)}%`,
+                  },
+                ]}
+              />
+            </View>
+            {controller.restOvertimeMs > 0 ? (
+              <View
+                style={[
+                  styles.restOvertimeFill,
+                  {
+                    backgroundColor: theme.palette.danger,
+                    width: `${Math.round(controller.restOvertimeProgress * 100)}%`,
+                  },
+                ]}
+              />
+            ) : null}
           </View>
         </View>
       ) : null}

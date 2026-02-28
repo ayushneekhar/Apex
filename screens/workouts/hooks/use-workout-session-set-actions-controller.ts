@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { triggerSelectionHaptic, triggerSuccessHaptic } from "@/lib/haptics";
+import { triggerSuccessHaptic } from "@/lib/haptics";
 import {
   cancelScheduledNotification,
   scheduleRestCompleteNotification,
@@ -12,7 +12,11 @@ import {
 } from "@/lib/weight";
 import type { ActiveWorkoutSession, ActiveWorkoutSet } from "@/types/workout";
 
-import type { ActiveRestTimer, CustomSetEditMode } from "../types";
+import type {
+  ActiveRestTimer,
+  CustomSetEditMode,
+  CustomWeightApplyScope,
+} from "../types";
 import { clampRestSeconds } from "../utils";
 
 type SessionSetActionsDeps = {
@@ -25,7 +29,8 @@ type SessionSetActionsDeps = {
   setSessionSetCustomValues: (
     setId: string,
     reps: number,
-    weightKg: number
+    weightKg: number,
+    weightScope?: CustomWeightApplyScope
   ) => Promise<void>;
   finishActiveWorkoutSession: () => Promise<void>;
   discardActiveWorkoutSession: () => Promise<void>;
@@ -57,6 +62,22 @@ function getRestProgress(activeRestTimer: ActiveRestTimer | null, restRemainingM
     1,
     Math.max(0, (activeRestTimer.durationMs - restRemainingMs) / activeRestTimer.durationMs)
   );
+}
+
+function getRestOvertimeMs(activeRestTimer: ActiveRestTimer | null, now: number) {
+  if (!activeRestTimer) {
+    return 0;
+  }
+
+  return Math.max(0, now - activeRestTimer.endsAt);
+}
+
+function getRestOvertimeProgress(activeRestTimer: ActiveRestTimer | null, restOvertimeMs: number) {
+  if (!activeRestTimer || activeRestTimer.durationMs <= 0) {
+    return 0;
+  }
+
+  return Math.min(1, Math.max(0, restOvertimeMs / activeRestTimer.durationMs));
 }
 
 async function cancelRestNotificationIfPresent(notificationId: string | null) {
@@ -129,6 +150,8 @@ export function useWorkoutSessionSetActionsController({
   const [customSetRepsInput, setCustomSetRepsInput] = useState("");
   const [customSetWeightInput, setCustomSetWeightInput] = useState("");
   const [customSetError, setCustomSetError] = useState<string | null>(null);
+  const [customWeightApplyScope, setCustomWeightApplyScope] =
+    useState<CustomWeightApplyScope>("current");
   const [isDiscardSessionModalOpen, setIsDiscardSessionModalOpen] =
     useState(false);
 
@@ -148,6 +171,14 @@ export function useWorkoutSessionSetActionsController({
   const restProgress = useMemo(
     () => getRestProgress(activeRestTimer, restRemainingMs),
     [activeRestTimer, restRemainingMs]
+  );
+  const restOvertimeMs = useMemo(
+    () => getRestOvertimeMs(activeRestTimer, now),
+    [activeRestTimer, now]
+  );
+  const restOvertimeProgress = useMemo(
+    () => getRestOvertimeProgress(activeRestTimer, restOvertimeMs),
+    [activeRestTimer, restOvertimeMs]
   );
 
   const restIsComplete = activeRestTimer !== null && restRemainingMs === 0;
@@ -185,6 +216,7 @@ export function useWorkoutSessionSetActionsController({
       formatWeightInputFromKg(setEntry.actualWeightKg, weightUnit)
     );
     setCustomSetError(null);
+    setCustomWeightApplyScope("current");
   }
 
   function closeCustomSetModal() {
@@ -193,6 +225,7 @@ export function useWorkoutSessionSetActionsController({
     setCustomSetRepsInput("");
     setCustomSetWeightInput("");
     setCustomSetError(null);
+    setCustomWeightApplyScope("current");
   }
 
   async function saveCustomSetValues() {
@@ -217,7 +250,8 @@ export function useWorkoutSessionSetActionsController({
       await setSessionSetCustomValues(
         customSetId,
         resolvedValues.reps,
-        resolvedValues.weightKg
+        resolvedValues.weightKg,
+        customSetEditMode === "weight" ? customWeightApplyScope : "current"
       );
       closeCustomSetModal();
     } catch {
@@ -333,6 +367,8 @@ export function useWorkoutSessionSetActionsController({
     activeRestTimer,
     restRemainingMs,
     restProgress,
+    restOvertimeMs,
+    restOvertimeProgress,
     restIsComplete,
 
     handleSetPress,
@@ -345,8 +381,10 @@ export function useWorkoutSessionSetActionsController({
     customSetRepsInput,
     customSetWeightInput,
     customSetError,
+    customWeightApplyScope,
     setCustomSetRepsInput,
     setCustomSetWeightInput,
+    setCustomWeightApplyScope,
     saveCustomSetValues,
     closeCustomSetModal,
     clearCustomSetError,

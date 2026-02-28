@@ -1,4 +1,4 @@
-import { Modal, View } from 'react-native';
+import { Pressable, Modal, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
@@ -6,8 +6,15 @@ import { NeonInput } from '@/components/ui/neon-input';
 
 import { WEIGHT_KEYBOARD_TYPE } from '../constants';
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
+import type { CustomWeightApplyScope } from '../types';
 import { ErrorNotice } from './common/ErrorNotice';
 import { styles } from './SessionModal.styles';
+
+const weightApplyScopeOptions: { label: string; value: CustomWeightApplyScope }[] = [
+  { label: 'Current set', value: 'current' },
+  { label: 'Remaining sets', value: 'remaining' },
+  { label: 'All sets', value: 'all' },
+];
 
 export function EditCustomSetModal({
   controller,
@@ -53,16 +60,45 @@ export function EditCustomSetModal({
               }}
             />
           ) : (
-            <NeonInput
-              label="Weight"
-              keyboardType={WEIGHT_KEYBOARD_TYPE}
-              value={controller.customSetWeightInput}
-              onChangeText={(value) => {
-                controller.setCustomSetWeightInput(value);
-                controller.clearCustomSetError();
-              }}
-              suffix={settings.weightUnit}
-            />
+            <>
+              <NeonInput
+                label="Weight"
+                keyboardType={WEIGHT_KEYBOARD_TYPE}
+                value={controller.customSetWeightInput}
+                onChangeText={(value) => {
+                  controller.setCustomSetWeightInput(value);
+                  controller.clearCustomSetError();
+                }}
+                suffix={settings.weightUnit}
+              />
+
+              <View style={styles.scopeTabs}>
+                {weightApplyScopeOptions.map((option) => {
+                  const isSelected = option.value === controller.customWeightApplyScope;
+
+                  return (
+                    <Pressable
+                      key={option.value}
+                      onPress={() => controller.setCustomWeightApplyScope(option.value)}
+                      style={[
+                        styles.scopeTab,
+                        {
+                          borderColor: isSelected ? theme.palette.accent : theme.palette.border,
+                          backgroundColor: isSelected ? theme.palette.accent : theme.palette.panelSoft,
+                        },
+                      ]}
+                    >
+                      <AppText
+                        variant="label"
+                        style={{ color: isSelected ? theme.palette.accentContrast : theme.palette.textMuted }}
+                      >
+                        {option.label}
+                      </AppText>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
           )}
 
           {controller.customSetError ? <ErrorNotice message={controller.customSetError} /> : null}

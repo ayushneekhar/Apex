@@ -24,4 +24,19 @@ export const styles = StyleSheet.create({
   actionCell: {
     flex: 1,
   },
+  scopeTabs: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  scopeTab: {
+    flex: 1,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scopeHint: {
+    marginTop: -spacing.xxs,
+  },
 });

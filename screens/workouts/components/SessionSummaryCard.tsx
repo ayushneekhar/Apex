@@ -1,15 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { Pressable, View } from 'react-native';
-import Animated, { Easing, FadeIn, FadeOut } from 'react-native-reanimated';
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { Pressable, View } from "react-native";
+import Animated, { Easing, FadeIn, FadeOut } from "react-native-reanimated";
 
-import { AppText } from '@/components/ui/app-text';
-import { designTokens } from '@/constants/design-system';
-import { formatWeightFromKg } from '@/lib/weight';
+import { AppText } from "@/components/ui/app-text";
+import { designTokens } from "@/constants/design-system";
+import { formatWeightFromKg } from "@/lib/weight";
 
-import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
-import { formatDuration } from '../utils';
-import { styles } from './SessionSummaryCard.styles';
+import type { WorkoutsScreenController } from "../hooks/use-workouts-screen-controller";
+import { formatDuration } from "../utils";
+import { styles } from "./SessionSummaryCard.styles";
 
 const { opacity, sizes } = designTokens;
 
@@ -30,7 +30,8 @@ export function SessionSummaryCard({
           100,
           Math.round(
             (controller.restOvertimeMs /
-              (controller.activeRestTimer.durationMs + controller.restOvertimeMs)) *
+              (controller.activeRestTimer.durationMs +
+                controller.restOvertimeMs)) *
               100
           )
         )
@@ -54,7 +55,9 @@ export function SessionSummaryCard({
         Session Time
       </AppText>
       <View style={styles.timerValueRow}>
-        <AppText variant="display">{formatDuration(controller.sessionElapsed)}</AppText>
+        <AppText variant="display">
+          {formatDuration(controller.sessionElapsed)}
+        </AppText>
         <Pressable
           onPress={() => {
             void controller.toggleSessionPaused();
@@ -62,7 +65,9 @@ export function SessionSummaryCard({
           style={({ pressed }) => [
             styles.timerControlButton,
             {
-              borderColor: activeSession.isPaused ? theme.palette.accent : theme.palette.border,
+              borderColor: activeSession.isPaused
+                ? theme.palette.accent
+                : theme.palette.border,
               backgroundColor: activeSession.isPaused
                 ? `${theme.palette.accent}24`
                 : theme.palette.panelSoft,
@@ -71,9 +76,13 @@ export function SessionSummaryCard({
           ]}
         >
           <Ionicons
-            name={activeSession.isPaused ? 'play' : 'pause'}
+            name={activeSession.isPaused ? "play" : "pause"}
             size={sizes.iconLarge}
-            color={activeSession.isPaused ? theme.palette.accent : theme.palette.textPrimary}
+            color={
+              activeSession.isPaused
+                ? theme.palette.accent
+                : theme.palette.textPrimary
+            }
           />
         </Pressable>
       </View>
@@ -92,7 +101,10 @@ export function SessionSummaryCard({
               {
                 borderColor: theme.palette.accent,
                 backgroundColor: theme.palette.panelSoft,
-                opacity: pressed || controller.spotifyControlBusy ? opacity.pressedSoft : 1,
+                opacity:
+                  pressed || controller.spotifyControlBusy
+                    ? opacity.pressedSoft
+                    : 1,
               },
             ]}
           >
@@ -113,7 +125,7 @@ export function SessionSummaryCard({
                     controller.spotifyPreviewContentAnimatedStyle,
                   ]}
                 >
-                  {controller.spotifySwipePreviewDirection === 'next' ? (
+                  {controller.spotifySwipePreviewDirection === "next" ? (
                     <View style={styles.spotifyTrackText}>
                       <View style={styles.spotifyPreviewMetaRow}>
                         <Ionicons
@@ -126,13 +138,15 @@ export function SessionSummaryCard({
                         </AppText>
                       </View>
                       <AppText variant="label" numberOfLines={1}>
-                        {controller.spotifyNextQueuedTrack?.songName ?? 'No next track in queue'}
+                        {controller.spotifyNextQueuedTrack?.songName ??
+                          "No next track in queue"}
                       </AppText>
                       <AppText variant="micro" tone="muted" numberOfLines={1}>
-                        {controller.spotifyNextQueuedTrack?.artistNames ?? 'Start a queue in Spotify'}
+                        {controller.spotifyNextQueuedTrack?.artistNames ??
+                          "Start a queue in Spotify"}
                       </AppText>
                     </View>
-                  ) : controller.spotifySwipePreviewDirection === 'previous' ? (
+                  ) : controller.spotifySwipePreviewDirection === "previous" ? (
                     <View style={styles.spotifyTrackText}>
                       <View style={styles.spotifyPreviewMetaRow}>
                         <Ionicons
@@ -145,11 +159,12 @@ export function SessionSummaryCard({
                         </AppText>
                       </View>
                       <AppText variant="label" numberOfLines={1}>
-                        {controller.spotifyPreviousTrack?.songName ?? 'Previous track'}
+                        {controller.spotifyPreviousTrack?.songName ??
+                          "Previous track"}
                       </AppText>
                       <AppText variant="micro" tone="muted" numberOfLines={1}>
                         {controller.spotifyPreviousTrack?.artistNames ??
-                          'Swipe to go back in playback'}
+                          "Swipe to go back in playback"}
                       </AppText>
                     </View>
                   ) : null}
@@ -171,7 +186,9 @@ export function SessionSummaryCard({
                   >
                     {controller.spotifyNowPlaying.albumArtUrl ? (
                       <Image
-                        source={{ uri: controller.spotifyNowPlaying.albumArtUrl }}
+                        source={{
+                          uri: controller.spotifyNowPlaying.albumArtUrl,
+                        }}
                         contentFit="cover"
                         style={styles.spotifyArtwork}
                       />
@@ -207,10 +224,16 @@ export function SessionSummaryCard({
                     {controller.spotifyProgressLabel ? (
                       <AppText
                         variant="micro"
-                        tone={controller.spotifyNowPlaying.isPlaying ? "accent" : "muted"}
+                        tone={
+                          controller.spotifyNowPlaying.isPlaying
+                            ? "accent"
+                            : "muted"
+                        }
                       >
-                        {controller.spotifyNowPlaying.isPlaying ? "Playing" : "Paused"} •{" "}
-                        {controller.spotifyProgressLabel}
+                        {controller.spotifyNowPlaying.isPlaying
+                          ? "Playing"
+                          : "Paused"}{" "}
+                        • {controller.spotifyProgressLabel}
                       </AppText>
                     ) : null}
                     {controller.spotifyControlError ? (
@@ -235,8 +258,8 @@ export function SessionSummaryCard({
                 controller.restOvertimeMs > 0
                   ? theme.palette.danger
                   : controller.restIsComplete
-                    ? theme.palette.success
-                    : theme.palette.accent,
+                  ? theme.palette.success
+                  : theme.palette.accent,
               backgroundColor: theme.palette.panelSoft,
             },
           ]}
@@ -249,16 +272,16 @@ export function SessionSummaryCard({
               variant="label"
               tone={
                 controller.restOvertimeMs > 0
-                  ? 'danger'
+                  ? "danger"
                   : controller.restIsComplete
-                    ? 'success'
-                    : 'accent'
+                  ? "success"
+                  : "accent"
               }
             >
               {controller.restIsComplete
                 ? controller.restOvertimeMs > 0
                   ? `+${formatDuration(controller.restOvertimeMs)}`
-                  : 'Ready'
+                  : "Ready"
                 : formatDuration(controller.restRemainingMs)}
             </AppText>
           </View>
@@ -266,11 +289,16 @@ export function SessionSummaryCard({
             {controller.restOvertimeMs > 0
               ? `${controller.activeRestTimer.exerciseName}: overtime rest.`
               : controller.restIsComplete
-                ? `${controller.activeRestTimer.exerciseName}: go crush the next set.`
-                : `${controller.activeRestTimer.exerciseName}: recover now.`}
+              ? `${controller.activeRestTimer.exerciseName}: go crush the next set.`
+              : `${controller.activeRestTimer.exerciseName}: recover now.`}
           </AppText>
           <View style={styles.restProgressRow}>
-            <View style={[styles.restProgressTrack, { borderColor: theme.palette.border }]}>
+            <View
+              style={[
+                styles.restProgressTrack,
+                { borderColor: theme.palette.border },
+              ]}
+            >
               <View
                 style={[
                   styles.restProgressFill,
@@ -299,21 +327,35 @@ export function SessionSummaryCard({
       ) : null}
 
       <View style={styles.sessionStatsRow}>
-        <StatCell label="Completed" value={String(controller.completedSetCount)} />
+        <StatCell
+          label="Completed"
+          value={String(controller.completedSetCount)}
+        />
         <StatCell
           label="Total Lifted"
-          value={formatWeightFromKg(controller.totalSessionVolumeKg, settings.weightUnit)}
+          value={formatWeightFromKg(
+            controller.totalSessionVolumeKg,
+            settings.weightUnit
+          )}
         />
         <StatCell
           label="Remaining"
-          value={String(Math.max(0, activeSession.sets.length - controller.completedSetCount))}
+          value={String(
+            Math.max(
+              0,
+              activeSession.sets.length - controller.completedSetCount
+            )
+          )}
         />
       </View>
 
       {activeSession.restoredFromAppClose && activeSession.isPaused ? (
-        <View style={[styles.recoveryCard, { borderColor: theme.palette.accent }]}>
+        <View
+          style={[styles.recoveryCard, { borderColor: theme.palette.accent }]}
+        >
           <AppText tone="accent">
-            Session was paused after app relaunch. Tap Resume to continue the timer.
+            Session was paused after app relaunch. Tap Resume to continue the
+            timer.
           </AppText>
         </View>
       ) : null}

@@ -45,7 +45,10 @@ type CustomSetSaveResult =
       weightKg: number;
     };
 
-function getRestRemainingMs(activeRestTimer: ActiveRestTimer | null, now: number) {
+function getRestRemainingMs(
+  activeRestTimer: ActiveRestTimer | null,
+  now: number
+) {
   if (!activeRestTimer) {
     return 0;
   }
@@ -53,31 +56,33 @@ function getRestRemainingMs(activeRestTimer: ActiveRestTimer | null, now: number
   return Math.max(0, activeRestTimer.endsAt - now);
 }
 
-function getRestProgress(activeRestTimer: ActiveRestTimer | null, restRemainingMs: number) {
+function getRestProgress(
+  activeRestTimer: ActiveRestTimer | null,
+  restRemainingMs: number
+) {
   if (!activeRestTimer || activeRestTimer.durationMs <= 0) {
     return 0;
   }
 
   return Math.min(
     1,
-    Math.max(0, (activeRestTimer.durationMs - restRemainingMs) / activeRestTimer.durationMs)
+    Math.max(
+      0,
+      (activeRestTimer.durationMs - restRemainingMs) /
+        activeRestTimer.durationMs
+    )
   );
 }
 
-function getRestOvertimeMs(activeRestTimer: ActiveRestTimer | null, now: number) {
+function getRestOvertimeMs(
+  activeRestTimer: ActiveRestTimer | null,
+  now: number
+) {
   if (!activeRestTimer) {
     return 0;
   }
 
   return Math.max(0, now - activeRestTimer.endsAt);
-}
-
-function getRestOvertimeProgress(activeRestTimer: ActiveRestTimer | null, restOvertimeMs: number) {
-  if (!activeRestTimer || activeRestTimer.durationMs <= 0) {
-    return 0;
-  }
-
-  return Math.min(1, Math.max(0, restOvertimeMs / activeRestTimer.durationMs));
 }
 
 async function cancelRestNotificationIfPresent(notificationId: string | null) {
@@ -101,11 +106,11 @@ function resolveCustomSetValues({
   weightInput: string;
   weightUnit: WeightUnit;
 }): CustomSetSaveResult {
-  if (editMode === 'reps') {
+  if (editMode === "reps") {
     const parsedReps = Number.parseInt(repsInput.trim(), 10);
 
     if (!Number.isFinite(parsedReps) || parsedReps < 0) {
-      return { error: 'Reps must be zero or above.' };
+      return { error: "Reps must be zero or above." };
     }
 
     return {
@@ -117,7 +122,7 @@ function resolveCustomSetValues({
   const parsedWeightKg = parseWeightInputToKg(weightInput.trim(), weightUnit);
 
   if (parsedWeightKg === null) {
-    return { error: 'Weight is invalid. Use a valid number.' };
+    return { error: "Weight is invalid. Use a valid number." };
   }
 
   return {
@@ -176,11 +181,6 @@ export function useWorkoutSessionSetActionsController({
     () => getRestOvertimeMs(activeRestTimer, now),
     [activeRestTimer, now]
   );
-  const restOvertimeProgress = useMemo(
-    () => getRestOvertimeProgress(activeRestTimer, restOvertimeMs),
-    [activeRestTimer, restOvertimeMs]
-  );
-
   const restIsComplete = activeRestTimer !== null && restRemainingMs === 0;
 
   useEffect(() => {
@@ -241,7 +241,7 @@ export function useWorkoutSessionSetActionsController({
       weightUnit,
     });
 
-    if ('error' in resolvedValues) {
+    if ("error" in resolvedValues) {
       setCustomSetError(resolvedValues.error);
       return;
     }
@@ -255,7 +255,7 @@ export function useWorkoutSessionSetActionsController({
       );
       closeCustomSetModal();
     } catch {
-      setCustomSetError('Could not save set values. Try again.');
+      setCustomSetError("Could not save set values. Try again.");
     }
   }
 
@@ -368,7 +368,6 @@ export function useWorkoutSessionSetActionsController({
     restRemainingMs,
     restProgress,
     restOvertimeMs,
-    restOvertimeProgress,
     restIsComplete,
 
     handleSetPress,

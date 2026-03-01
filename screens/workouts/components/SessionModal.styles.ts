@@ -1,6 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet } from "react-native";
 
-import { designTokens } from '@/constants/design-system';
+import { designTokens } from "@/constants/design-system";
 
 const { border, overlay, radii, spacing } = designTokens;
 
@@ -8,7 +8,7 @@ export const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: overlay.modalBackdrop,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: spacing.xxxl,
   },
   card: {
@@ -18,7 +18,7 @@ export const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
   },
   actionCell: {
@@ -35,5 +35,8 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     alignItems: "center",
     justifyContent: "center",
+  },
+  scopeHint: {
+    marginTop: -spacing.xxs,
   },
 });

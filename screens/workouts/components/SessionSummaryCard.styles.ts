@@ -1,6 +1,6 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet } from "react-native";
 
-import { designTokens } from '@/constants/design-system';
+import { designTokens } from "@/constants/design-system";
 
 const { border, radii, sizes, spacing } = designTokens;
 
@@ -12,9 +12,9 @@ export const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   timerValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.md,
   },
   timerControlButton: {
@@ -22,8 +22,8 @@ export const styles = StyleSheet.create({
     height: sizes.iconButton,
     borderWidth: border.thin,
     borderRadius: radii.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   spotifyCard: {
     borderWidth: border.thin,
@@ -32,31 +32,31 @@ export const styles = StyleSheet.create({
     paddingVertical: spacing.md,
   },
   spotifyCardStack: {
-    position: 'relative',
+    position: "relative",
     minHeight: sizes.iconLarge * 2,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   spotifyCardPreviewLayer: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     bottom: 0,
-    justifyContent: 'center',
-    overflow: 'hidden',
+    justifyContent: "center",
+    overflow: "hidden",
   },
   spotifyCardPreviewContent: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   spotifyCardContentLayer: {
-    position: 'relative',
+    position: "relative",
   },
   spotifyArtworkWrap: {
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   spotifyTrackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.md,
   },
   spotifyArtwork: {
@@ -69,16 +69,16 @@ export const styles = StyleSheet.create({
     height: sizes.iconLarge * 2,
     borderWidth: border.thin,
     borderRadius: radii.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   spotifyTrackText: {
     flex: 1,
     gap: spacing.xxxs,
   },
   spotifyPreviewMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: spacing.xs,
   },
   restTimerCard: {
@@ -89,48 +89,43 @@ export const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   restTimerHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: spacing.sm,
   },
   restProgressRow: {
-    position: 'relative',
-    width: '100%',
+    width: "100%",
   },
   restProgressTrack: {
-    width: '100%',
+    width: "100%",
     height: spacing.sm,
     borderWidth: border.thin,
     borderRadius: radii.pill,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   restProgressFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: radii.pill,
   },
-  restOvertimeFill: {
-    position: 'absolute',
-    left: '100%',
+  restProgressOvertimeFill: {
+    position: "absolute",
+    right: 0,
     top: 0,
-    marginLeft: spacing.xs,
-    height: spacing.sm,
-    minWidth: spacing.xxs,
-    borderRadius: radii.pill,
-    maxWidth: '100%',
+    height: "100%",
   },
   sessionStatsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: spacing.sm,
   },
   sessionStatCell: {
     flex: 1,
     gap: spacing.xxs,
-    alignItems: 'center',
+    alignItems: "center",
   },
   sessionStatLabel: {
     minHeight: sizes.setBoxMinLabelHeight,
-    textAlign: 'center',
+    textAlign: "center",
   },
   recoveryCard: {
     borderWidth: border.thin,

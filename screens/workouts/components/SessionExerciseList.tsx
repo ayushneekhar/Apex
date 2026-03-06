@@ -96,6 +96,24 @@ export function SessionExerciseList({
                   </View>
                 ) : null}
               </View>
+              {group.supersetPartnerExerciseName ? (
+                <View
+                  style={[
+                    styles.supersetBadge,
+                    {
+                      borderColor: `${theme.palette.accent}55`,
+                      backgroundColor: `${theme.palette.accent}16`,
+                    },
+                  ]}
+                >
+                  <Ionicons name="git-compare-outline" size={13} color={theme.palette.accent} />
+                  <AppText variant="micro" tone="accent">
+                    {group.supersetPosition === 'lead'
+                      ? `Superset with ${group.supersetPartnerExerciseName}`
+                      : `Returns to ${group.supersetPartnerExerciseName}`}
+                  </AppText>
+                </View>
+              ) : null}
               <AppText variant="micro" tone="muted">
                 Target {formatWeightFromKg(Math.abs(group.targetWeightKg), settings.weightUnit)}
                 {groupIsAssisted ? ' assisted' : ''} {' • '}Rest {formatDuration(group.restSeconds * 1000)}

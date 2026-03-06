@@ -23,6 +23,7 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
   const { theme, activeSession } = controller;
   const [isApplyingOverload, setIsApplyingOverload] = useState(false);
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+  const supersetCount = workout.exercises.filter((exercise) => exercise.supersetWithNext).length;
   const lastSession = workout.sessions[0];
   const sessionBlocked = activeSession !== null && activeSession.workoutId !== workout.id;
   const startButtonTitle = activeSession?.workoutId === workout.id ? 'Continue' : 'Start';
@@ -118,6 +119,9 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
           <MetaChip controller={controller} label={`${workout.exercises.length} exercises`} />
           <MetaChip controller={controller} label={`${totalSets} sets`} />
           <MetaChip controller={controller} label={`~${estimateWorkoutMinutes(workout)} min`} />
+          {supersetCount > 0 ? (
+            <MetaChip controller={controller} label={`${supersetCount} superset${supersetCount === 1 ? '' : 's'}`} />
+          ) : null}
         </View>
 
         <AppText tone="muted">

@@ -35,6 +35,16 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.xxxs,
   },
+  supersetBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxxs,
+  },
   setBoxGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',

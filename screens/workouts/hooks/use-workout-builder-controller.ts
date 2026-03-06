@@ -21,6 +21,19 @@ import {
   parseRestSecondsInput,
 } from "../utils";
 
+function normalizeSupersetDrafts(drafts: ExerciseDraft[]): ExerciseDraft[] {
+  return drafts.map((draft, index) => {
+    const previousStartsSuperset = index > 0 ? drafts[index - 1].supersetWithNext : false;
+    const canStartSuperset = index < drafts.length - 1 && !previousStartsSuperset;
+
+    if (draft.supersetWithNext === canStartSuperset || !draft.supersetWithNext) {
+      return canStartSuperset ? draft : { ...draft, supersetWithNext: false };
+    }
+
+    return draft;
+  });
+}
+
 type BuilderDeps = {
   weightUnit: WeightUnit;
   clearStoreError: () => void;
@@ -89,6 +102,7 @@ export function useWorkoutBuilderController({
             exercise.overloadIncrementKg,
             weightUnit
           ),
+          supersetWithNext: exercise.supersetWithNext,
         }))
     );
     setCustomExerciseName("");
@@ -131,13 +145,40 @@ export function useWorkoutBuilderController({
   }
 
   function removeExerciseDraft(id: string) {
-    setExerciseDrafts((current) => current.filter((item) => item.id !== id));
+    setExerciseDrafts((current) =>
+      normalizeSupersetDrafts(current.filter((item) => item.id !== id))
+    );
   }
 
   function updateExerciseDraft(id: string, patch: Record<string, string>) {
     setExerciseDrafts((current) =>
       current.map((item) => (item.id === id ? { ...item, ...patch } : item))
     );
+  }
+
+  function toggleExerciseSuperset(id: string) {
+    setExerciseDrafts((current) => {
+      const draftIndex = current.findIndex((item) => item.id === id);
+
+      if (draftIndex === -1) {
+        return current;
+      }
+
+      const isLastExercise = draftIndex >= current.length - 1;
+      const previousStartsSuperset =
+        draftIndex > 0 ? current[draftIndex - 1].supersetWithNext : false;
+      const nextSupersetValue = !current[draftIndex].supersetWithNext;
+
+      if (nextSupersetValue && (isLastExercise || previousStartsSuperset)) {
+        return current;
+      }
+
+      return normalizeSupersetDrafts(
+        current.map((item) =>
+          item.id === id ? { ...item, supersetWithNext: nextSupersetValue } : item
+        )
+      );
+    });
   }
 
   function adjustDraftRestSeconds(id: string, delta: number) {
@@ -226,7 +267,30 @@ export function useWorkoutBuilderController({
         restSeconds: restSecondsInput,
         startWeightKg,
         overloadIncrementKg: overloadKg,
+        supersetWithNext: draft.supersetWithNext,
       });
+    }
+
+    for (let index = 0; index < parsedExercises.length; index += 1) {
+      const exercise = parsedExercises[index];
+
+      if (!exercise.supersetWithNext) {
+        continue;
+      }
+
+      const nextExercise = parsedExercises[index + 1];
+
+      if (!nextExercise) {
+        setFormError(`${exercise.name} cannot start a superset without a following exercise.`);
+        return;
+      }
+
+      if (exercise.sets !== nextExercise.sets) {
+        setFormError(
+          `${exercise.name} and ${nextExercise.name} need the same set count to run as a superset.`
+        );
+        return;
+      }
     }
 
     try {
@@ -255,6 +319,20 @@ export function useWorkoutBuilderController({
     setFormError((current) => (current ? null : current));
   }
 
+  function canExerciseStartSuperset(id: string) {
+    const draftIndex = exerciseDrafts.findIndex((item) => item.id === id);
+
+    if (draftIndex === -1) {
+      return false;
+    }
+
+    const isLastExercise = draftIndex >= exerciseDrafts.length - 1;
+    const previousStartsSuperset =
+      draftIndex > 0 ? exerciseDrafts[draftIndex - 1].supersetWithNext : false;
+
+    return !isLastExercise && !previousStartsSuperset;
+  }
+
   return {
     isComposerOpen,
     workoutName,
@@ -274,6 +352,8 @@ export function useWorkoutBuilderController({
     addCustomExercise,
     removeExerciseDraft,
     updateExerciseDraft,
+    toggleExerciseSuperset,
+    canExerciseStartSuperset,
     adjustDraftRestSeconds,
     submitWorkout,
     clearFormError,

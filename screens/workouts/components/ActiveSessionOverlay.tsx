@@ -88,7 +88,7 @@ export function ActiveSessionOverlay({
           >
             <AppText variant="heading">{activeSession.workoutName}</AppText>
             <AppText tone="muted">
-              Tap top of a set to mark complete or decrement reps. Press and hold the set to edit reps. Tap bottom strip to edit weight.
+              Tap top of a set to mark complete or decrement reps. Supersets automatically alternate between paired exercises before rest. Press and hold the set to edit reps. Tap bottom strip to edit weight.
             </AppText>
           </Animated.View>
         </Animated.View>

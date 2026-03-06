@@ -131,6 +131,58 @@ function resolveCustomSetValues({
   };
 }
 
+function getSupersetPartnerSet(
+  activeSession: ActiveWorkoutSession,
+  setEntry: ActiveWorkoutSet
+) {
+  if (!setEntry.supersetGroupId) {
+    return null;
+  }
+
+  return (
+    activeSession.sets.find(
+      (candidate) =>
+        candidate.id !== setEntry.id &&
+        candidate.supersetGroupId === setEntry.supersetGroupId &&
+        candidate.setNumber === setEntry.setNumber
+    ) ?? null
+  );
+}
+
+function shouldStartRestAfterCompletion(
+  activeSession: ActiveWorkoutSession,
+  setEntry: ActiveWorkoutSet
+) {
+  if (setEntry.supersetPosition !== "lead") {
+    return true;
+  }
+
+  const partnerSet = getSupersetPartnerSet(activeSession, setEntry);
+
+  return partnerSet ? partnerSet.actualReps > 0 : true;
+}
+
+function getRestTimerDetails(
+  activeSession: ActiveWorkoutSession,
+  setEntry: ActiveWorkoutSet
+) {
+  const partnerSet = getSupersetPartnerSet(activeSession, setEntry);
+
+  if (setEntry.supersetPosition === "trail" && partnerSet) {
+    return {
+      setId: setEntry.id,
+      exerciseName: `${partnerSet.exerciseName} + ${setEntry.exerciseName}`,
+      restSeconds: Math.max(setEntry.restSeconds, partnerSet.restSeconds),
+    };
+  }
+
+  return {
+    setId: setEntry.id,
+    exerciseName: setEntry.exerciseName,
+    restSeconds: setEntry.restSeconds,
+  };
+}
+
 export function useWorkoutSessionSetActionsController({
   activeSession,
   weightUnit,
@@ -269,9 +321,17 @@ export function useWorkoutSessionSetActionsController({
     await cancelRestNotificationIfPresent(notificationToCancel);
   }
 
-  async function startRestTimer(setEntry: ActiveWorkoutSet) {
-    const restSeconds = clampRestSeconds(setEntry.restSeconds);
-    const durationMs = restSeconds * 1000;
+  async function startRestTimer({
+    setId,
+    exerciseName,
+    restSeconds,
+  }: {
+    setId: string;
+    exerciseName: string;
+    restSeconds: number;
+  }) {
+    const durationSeconds = clampRestSeconds(restSeconds);
+    const durationMs = durationSeconds * 1000;
     const startedAt = Date.now();
     const nextToken = restScheduleTokenRef.current + 1;
     restScheduleTokenRef.current = nextToken;
@@ -279,8 +339,8 @@ export function useWorkoutSessionSetActionsController({
     const notificationToCancel = restNotificationId;
 
     setActiveRestTimer({
-      setId: setEntry.id,
-      exerciseName: setEntry.exerciseName,
+      setId,
+      exerciseName,
       startedAt,
       endsAt: startedAt + durationMs,
       durationMs,
@@ -292,8 +352,8 @@ export function useWorkoutSessionSetActionsController({
     }
 
     const nextNotificationId = await scheduleRestCompleteNotification(
-      restSeconds,
-      setEntry.exerciseName
+      durationSeconds,
+      exerciseName
     );
 
     if (restScheduleTokenRef.current !== nextToken) {
@@ -305,15 +365,24 @@ export function useWorkoutSessionSetActionsController({
   }
 
   async function handleSetPress(setEntry: ActiveWorkoutSet) {
-    const shouldStartRest = setEntry.actualReps === 0;
+    if (!activeSession) {
+      return;
+    }
+
+    const isCompletingSet = setEntry.actualReps === 0;
+    const shouldStartRest =
+      isCompletingSet && shouldStartRestAfterCompletion(activeSession, setEntry);
+    const restTimerDetails = isCompletingSet
+      ? getRestTimerDetails(activeSession, setEntry)
+      : null;
 
     try {
       await decrementOrCompleteSessionSet(setEntry.id);
       setSessionActionError(null);
 
-      if (shouldStartRest) {
+      if (shouldStartRest && restTimerDetails) {
         triggerSuccessHaptic();
-        await startRestTimer(setEntry);
+        await startRestTimer(restTimerDetails);
         return;
       }
     } catch {

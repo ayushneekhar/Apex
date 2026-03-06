@@ -54,16 +54,31 @@ export function useWorkoutSessionUiController({
   const groupedActiveSets = useMemo(
     () => {
       const grouped = groupActiveSetsByExercise(activeSession?.sets ?? []);
+      const nextIncompleteSetIndexByExerciseId = new Map<string, number>();
+
+      activeSession?.sets.forEach((setEntry, index) => {
+        if (setEntry.actualReps > 0 || nextIncompleteSetIndexByExerciseId.has(setEntry.workoutExerciseId)) {
+          return;
+        }
+
+        nextIncompleteSetIndexByExerciseId.set(setEntry.workoutExerciseId, index);
+      });
 
       return grouped
         .map((group, index) => ({
           group,
           index,
           isCompleted: group.sets.length > 0 && group.sets.every((setEntry) => setEntry.actualReps > 0),
+          nextIncompleteSetIndex:
+            nextIncompleteSetIndexByExerciseId.get(group.workoutExerciseId) ?? Number.POSITIVE_INFINITY,
         }))
         .sort((a, b) => {
           if (a.isCompleted !== b.isCompleted) {
             return a.isCompleted ? 1 : -1;
+          }
+
+          if (a.nextIncompleteSetIndex !== b.nextIncompleteSetIndex) {
+            return a.nextIncompleteSetIndex - b.nextIncompleteSetIndex;
           }
 
           return a.index - b.index;

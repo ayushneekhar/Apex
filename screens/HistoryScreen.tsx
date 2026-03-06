@@ -12,6 +12,7 @@ import { useAppTheme } from '@/hooks/use-app-theme';
 import { formatWeightFromKg, formatWeightInputFromKg, parseWeightInputToKg } from '@/lib/weight';
 import { useAppStore } from '@/store/use-app-store';
 import type { WorkoutSession } from '@/types/workout';
+import { formatDuration } from './workouts/utils';
 import { styles } from './HistoryScreen.styles';
 
 type SessionSetDraft = {
@@ -43,6 +44,10 @@ type CalendarCell = {
 
 function getSessionVolumeKg(session: WorkoutSession): number {
   return session.sets.reduce((total, setEntry) => total + Math.abs(setEntry.weightKg) * setEntry.reps, 0);
+}
+
+function getSessionDurationLabel(session: WorkoutSession): string {
+  return session.durationMs === null ? 'Legacy' : formatDuration(session.durationMs);
 }
 
 function toLocalDateKey(timestamp: number): string {
@@ -313,6 +318,7 @@ export default function HistoryScreen() {
         sessionId: editingSession.session.id,
         workoutId: editingSession.workoutId,
         performedAt: editingSession.session.performedAt,
+        durationMs: editingSession.session.durationMs,
         bodyweightKg: parsedBodyweight,
         sets: parsedSets,
       });
@@ -553,6 +559,19 @@ export default function HistoryScreen() {
                     Volume
                   </AppText>
                   <AppText tone="accent">{formatWeightFromKg(totalVolumeKg, settings.weightUnit)}</AppText>
+                </View>
+                <View
+                  style={[
+                    styles.statChip,
+                    {
+                      borderColor: theme.palette.border,
+                      backgroundColor: theme.palette.panelSoft,
+                    },
+                  ]}>
+                  <AppText variant="micro" tone="muted">
+                    Duration
+                  </AppText>
+                  <AppText>{getSessionDurationLabel(item.session)}</AppText>
                 </View>
               </View>
 

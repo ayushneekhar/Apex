@@ -27,6 +27,7 @@ import type { WeightUnit } from '@/lib/weight';
 import type {
   ActiveWorkoutSession,
   ActiveWorkoutSet,
+  ActiveWorkoutSetSupersetPosition,
   AppSettings,
   NewWorkoutInput,
   NewWorkoutSessionInput,
@@ -105,6 +106,76 @@ function getSessionSetNameLookupKey(exerciseName: string, setNumber: number): st
   return `${exerciseName.trim().toLowerCase()}:${setNumber}`;
 }
 
+function getSessionElapsedMs(session: ActiveWorkoutSession, now: number): number {
+  return Math.max(0, now - session.startedAt - session.totalPausedMs - elapsedPauseMs(session, now));
+}
+
+function buildSessionSetSequence(workout: Workout): {
+  exercise: Workout['exercises'][number];
+  setNumber: number;
+  supersetGroupId: string | null;
+  supersetPartnerExerciseName: string | null;
+  supersetPosition: ActiveWorkoutSetSupersetPosition;
+}[] {
+  const sequence: {
+    exercise: Workout['exercises'][number];
+    setNumber: number;
+    supersetGroupId: string | null;
+    supersetPartnerExerciseName: string | null;
+    supersetPosition: ActiveWorkoutSetSupersetPosition;
+  }[] = [];
+
+  for (let index = 0; index < workout.exercises.length; index += 1) {
+    const exercise = workout.exercises[index];
+    const nextExercise = workout.exercises[index + 1];
+
+    if (exercise.supersetWithNext && nextExercise) {
+      const roundCount = Math.max(exercise.sets, nextExercise.sets);
+      const supersetGroupId = `${exercise.id}:${nextExercise.id}`;
+
+      for (let round = 1; round <= roundCount; round += 1) {
+        const leadExists = round <= exercise.sets;
+        const trailExists = round <= nextExercise.sets;
+
+        if (leadExists) {
+          sequence.push({
+            exercise,
+            setNumber: round,
+            supersetGroupId: trailExists ? supersetGroupId : null,
+            supersetPartnerExerciseName: trailExists ? nextExercise.name : null,
+            supersetPosition: trailExists ? 'lead' : 'none',
+          });
+        }
+
+        if (trailExists) {
+          sequence.push({
+            exercise: nextExercise,
+            setNumber: round,
+            supersetGroupId: leadExists ? supersetGroupId : null,
+            supersetPartnerExerciseName: leadExists ? exercise.name : null,
+            supersetPosition: leadExists ? 'trail' : 'none',
+          });
+        }
+      }
+
+      index += 1;
+      continue;
+    }
+
+    for (let setNumber = 1; setNumber <= exercise.sets; setNumber += 1) {
+      sequence.push({
+        exercise,
+        setNumber,
+        supersetGroupId: null,
+        supersetPartnerExerciseName: null,
+        supersetPosition: 'none',
+      });
+    }
+  }
+
+  return sequence;
+}
+
 function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
   const mostRecentSession = getMostRecentWorkoutSession(workout);
   const lastSessionWeightByExerciseSet = new Map<string, number>();
@@ -125,11 +196,15 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
     );
   });
 
-  return workout.exercises.flatMap((exercise) => {
-    const targetWeightKg = getTargetWeightKg(workout, exercise);
-
-    return Array.from({ length: exercise.sets }, (_, index) => {
-      const setNumber = index + 1;
+  return buildSessionSetSequence(workout).map(
+    ({
+      exercise,
+      setNumber,
+      supersetGroupId,
+      supersetPartnerExerciseName,
+      supersetPosition,
+    }) => {
+      const targetWeightKg = getTargetWeightKg(workout, exercise);
       const actualWeightKg =
         lastSessionWeightByExerciseSet.get(getSessionSetIdLookupKey(exercise.id, setNumber)) ??
         lastSessionWeightByExerciseNameSet.get(getSessionSetNameLookupKey(exercise.name, setNumber)) ??
@@ -145,9 +220,12 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
         actualWeightKg,
         restSeconds: exercise.restSeconds,
         actualReps: 0,
+        supersetGroupId,
+        supersetPartnerExerciseName,
+        supersetPosition,
       };
-    });
-  });
+    }
+  );
 }
 
 function getMostRecentBodyweightKg(workouts: Workout[]): number | null {
@@ -669,9 +747,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({ mutating: true, error: null });
 
     try {
+      const finishedAt = Date.now();
+
       await createWorkoutSession({
         workoutId: session.workoutId,
-        performedAt: Date.now(),
+        performedAt: finishedAt,
+        durationMs: getSessionElapsedMs(session, finishedAt),
         bodyweightKg: session.bodyweightKg,
         sets: session.sets.map((setEntry) => ({
           workoutExerciseId: setEntry.workoutExerciseId,

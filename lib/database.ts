@@ -48,6 +48,7 @@ type WorkoutExerciseRow = {
   rest_seconds: number;
   start_weight_kg: number;
   overload_increment_kg: number;
+  superset_with_next: number;
   sort_order: number;
 };
 
@@ -55,6 +56,7 @@ type WorkoutSessionRow = {
   id: string;
   workout_id: string;
   performed_at: number;
+  duration_ms: number | null;
   bodyweight_kg: number | null;
 };
 
@@ -122,6 +124,7 @@ export async function initializeDatabase(): Promise<void> {
       rest_seconds INTEGER NOT NULL DEFAULT 90,
       start_weight_kg REAL NOT NULL,
       overload_increment_kg REAL NOT NULL,
+      superset_with_next INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL,
       FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
     );
@@ -130,6 +133,7 @@ export async function initializeDatabase(): Promise<void> {
       id TEXT PRIMARY KEY NOT NULL,
       workout_id TEXT NOT NULL,
       performed_at INTEGER NOT NULL,
+      duration_ms INTEGER,
       bodyweight_kg REAL,
       FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE
     );
@@ -163,20 +167,30 @@ export async function initializeDatabase(): Promise<void> {
 
   const sessionTableColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(workout_sessions);');
   const hasBodyweightColumn = sessionTableColumns.some((column) => column.name === 'bodyweight_kg');
+  const hasDurationMsColumn = sessionTableColumns.some((column) => column.name === 'duration_ms');
 
   if (!hasBodyweightColumn) {
     await db.execAsync('ALTER TABLE workout_sessions ADD COLUMN bodyweight_kg REAL;');
+  }
+
+  if (!hasDurationMsColumn) {
+    await db.execAsync('ALTER TABLE workout_sessions ADD COLUMN duration_ms INTEGER;');
   }
 
   const exerciseTableColumns = await db.getAllAsync<{ name: string }>(
     'PRAGMA table_info(workout_exercises);'
   );
   const hasRestSecondsColumn = exerciseTableColumns.some((column) => column.name === 'rest_seconds');
+  const hasSupersetColumn = exerciseTableColumns.some((column) => column.name === 'superset_with_next');
 
   if (!hasRestSecondsColumn) {
     await db.execAsync(
       `ALTER TABLE workout_exercises ADD COLUMN rest_seconds INTEGER NOT NULL DEFAULT ${DEFAULT_REST_SECONDS};`
     );
+  }
+
+  if (!hasSupersetColumn) {
+    await db.execAsync('ALTER TABLE workout_exercises ADD COLUMN superset_with_next INTEGER NOT NULL DEFAULT 0;');
   }
 }
 
@@ -217,6 +231,21 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
       typeof activeSet.actualWeightKg === 'number' && Number.isFinite(activeSet.actualWeightKg)
         ? activeSet.actualWeightKg
         : activeSet.targetWeightKg;
+    const normalizedSupersetGroupId =
+      typeof activeSet.supersetGroupId === 'string' && activeSet.supersetGroupId.trim().length > 0
+        ? activeSet.supersetGroupId
+        : null;
+    const normalizedSupersetPartnerExerciseName =
+      typeof activeSet.supersetPartnerExerciseName === 'string' &&
+      activeSet.supersetPartnerExerciseName.trim().length > 0
+        ? activeSet.supersetPartnerExerciseName
+        : null;
+    const normalizedSupersetPosition =
+      activeSet.supersetPosition === 'lead' ||
+      activeSet.supersetPosition === 'trail' ||
+      activeSet.supersetPosition === 'none'
+        ? activeSet.supersetPosition
+        : 'none';
 
     return (
       typeof activeSet.id === 'string' &&
@@ -228,7 +257,11 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
       typeof normalizedActualWeightKg === 'number' &&
       Number.isFinite(normalizedActualWeightKg) &&
       typeof normalizedRestSeconds === 'number' &&
-      typeof activeSet.actualReps === 'number'
+      typeof activeSet.actualReps === 'number' &&
+      (normalizedSupersetGroupId === null || typeof normalizedSupersetGroupId === 'string') &&
+      (normalizedSupersetPartnerExerciseName === null ||
+        typeof normalizedSupersetPartnerExerciseName === 'string') &&
+      typeof normalizedSupersetPosition === 'string'
     );
   });
 
@@ -255,6 +288,21 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
         typeof set.restSeconds === 'number' && set.restSeconds > 0
           ? Math.floor(set.restSeconds)
           : DEFAULT_REST_SECONDS,
+      supersetGroupId:
+        typeof set.supersetGroupId === 'string' && set.supersetGroupId.trim().length > 0
+          ? set.supersetGroupId
+          : null,
+      supersetPartnerExerciseName:
+        typeof set.supersetPartnerExerciseName === 'string' &&
+        set.supersetPartnerExerciseName.trim().length > 0
+          ? set.supersetPartnerExerciseName
+          : null,
+      supersetPosition:
+        set.supersetPosition === 'lead' ||
+        set.supersetPosition === 'trail' ||
+        set.supersetPosition === 'none'
+          ? set.supersetPosition
+          : 'none',
     })),
   };
 }
@@ -366,6 +414,7 @@ export async function listWorkouts(): Promise<Workout[]> {
           rest_seconds,
           start_weight_kg,
           overload_increment_kg,
+          superset_with_next,
           sort_order
         FROM workout_exercises
         ORDER BY sort_order ASC;
@@ -377,6 +426,7 @@ export async function listWorkouts(): Promise<Workout[]> {
           id,
           workout_id,
           performed_at,
+          duration_ms,
           bodyweight_kg
         FROM workout_sessions
         ORDER BY performed_at DESC;
@@ -412,6 +462,7 @@ export async function listWorkouts(): Promise<Workout[]> {
           : DEFAULT_REST_SECONDS,
       startWeightKg: row.start_weight_kg,
       overloadIncrementKg: row.overload_increment_kg,
+      supersetWithNext: row.superset_with_next === 1,
       sortOrder: row.sort_order,
     };
 
@@ -452,6 +503,10 @@ export async function listWorkouts(): Promise<Workout[]> {
       id: row.id,
       workoutId: row.workout_id,
       performedAt: row.performed_at,
+      durationMs:
+        typeof row.duration_ms === 'number' && Number.isFinite(row.duration_ms) && row.duration_ms >= 0
+          ? Math.floor(row.duration_ms)
+          : null,
       bodyweightKg: row.bodyweight_kg,
       sets: sessionSetMap.get(row.id) ?? [],
     };
@@ -504,9 +559,10 @@ export async function createWorkout(input: NewWorkoutInput): Promise<void> {
             rest_seconds,
             start_weight_kg,
             overload_increment_kg,
+            superset_with_next,
             sort_order
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
         createId('exercise'),
         workoutId,
@@ -516,6 +572,7 @@ export async function createWorkout(input: NewWorkoutInput): Promise<void> {
         exercise.restSeconds,
         exercise.startWeightKg,
         exercise.overloadIncrementKg,
+        exercise.supersetWithNext ? 1 : 0,
         index
       );
     }
@@ -529,12 +586,13 @@ export async function createWorkoutSession(input: NewWorkoutSessionInput): Promi
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `
-      INSERT INTO workout_sessions (id, workout_id, performed_at, bodyweight_kg)
-      VALUES (?, ?, ?, ?);
+      INSERT INTO workout_sessions (id, workout_id, performed_at, duration_ms, bodyweight_kg)
+      VALUES (?, ?, ?, ?, ?);
       `,
       sessionId,
       input.workoutId,
       input.performedAt ?? Date.now(),
+      input.durationMs ?? null,
       input.bodyweightKg ?? null
     );
 
@@ -592,9 +650,10 @@ export async function updateWorkout(input: UpdateWorkoutInput): Promise<void> {
             rest_seconds,
             start_weight_kg,
             overload_increment_kg,
+            superset_with_next,
             sort_order
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
         createId('exercise'),
         input.id,
@@ -604,6 +663,7 @@ export async function updateWorkout(input: UpdateWorkoutInput): Promise<void> {
         exercise.restSeconds,
         exercise.startWeightKg,
         exercise.overloadIncrementKg,
+        exercise.supersetWithNext ? 1 : 0,
         index
       );
     }
@@ -617,11 +677,12 @@ export async function updateWorkoutSession(input: UpdateWorkoutSessionInput): Pr
     await db.runAsync(
       `
         UPDATE workout_sessions
-        SET workout_id = ?, performed_at = ?, bodyweight_kg = ?
+        SET workout_id = ?, performed_at = ?, duration_ms = ?, bodyweight_kg = ?
         WHERE id = ?;
       `,
       input.workoutId,
       input.performedAt,
+      input.durationMs ?? null,
       input.bodyweightKg ?? null,
       input.sessionId
     );

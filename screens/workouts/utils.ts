@@ -17,6 +17,7 @@ export function createExerciseDraft(name: string): ExerciseDraft {
     restSeconds: String(DEFAULT_REST_SECONDS),
     startWeight: '0',
     overload: '',
+    supersetWithNext: false,
   };
 }
 
@@ -52,29 +53,37 @@ export function groupActiveSetsByExercise(sets: ActiveWorkoutSet[]): ActiveSetGr
   const order: string[] = [];
 
   sets.forEach((setEntry) => {
-    const existing = groups.get(setEntry.exerciseName);
+    const existing = groups.get(setEntry.workoutExerciseId);
 
     if (existing) {
       existing.sets.push(setEntry);
       return;
     }
 
-    groups.set(setEntry.exerciseName, {
+    groups.set(setEntry.workoutExerciseId, {
+      workoutExerciseId: setEntry.workoutExerciseId,
       exerciseName: setEntry.exerciseName,
       targetWeightKg: setEntry.targetWeightKg,
       restSeconds: setEntry.restSeconds,
+      supersetGroupId: setEntry.supersetGroupId,
+      supersetPartnerExerciseName: setEntry.supersetPartnerExerciseName,
+      supersetPosition: setEntry.supersetPosition,
       sets: [setEntry],
     });
-    order.push(setEntry.exerciseName);
+    order.push(setEntry.workoutExerciseId);
   });
 
-  return order.map((exerciseName) => {
-    const group = groups.get(exerciseName);
+  return order.map((workoutExerciseId) => {
+    const group = groups.get(workoutExerciseId);
 
     return {
-      exerciseName,
+      workoutExerciseId,
+      exerciseName: group?.exerciseName ?? '',
       targetWeightKg: group?.targetWeightKg ?? 0,
       restSeconds: group?.restSeconds ?? DEFAULT_REST_SECONDS,
+      supersetGroupId: group?.supersetGroupId ?? null,
+      supersetPartnerExerciseName: group?.supersetPartnerExerciseName ?? null,
+      supersetPosition: group?.supersetPosition ?? 'none',
       sets: [...(group?.sets ?? [])].sort((a, b) => a.setNumber - b.setNumber),
     };
   });

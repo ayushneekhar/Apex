@@ -11,12 +11,17 @@ export type ExerciseDraft = {
   restSeconds: string;
   startWeight: string;
   overload: string;
+  supersetWithNext: boolean;
 };
 
 export type ActiveSetGroup = {
+  workoutExerciseId: string;
   exerciseName: string;
   targetWeightKg: number;
   restSeconds: number;
+  supersetGroupId: string | null;
+  supersetPartnerExerciseName: string | null;
+  supersetPosition: ActiveWorkoutSet['supersetPosition'];
   sets: ActiveWorkoutSet[];
 };
 

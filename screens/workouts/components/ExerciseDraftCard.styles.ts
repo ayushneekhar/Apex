@@ -17,6 +17,10 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  headerContent: {
+    flex: 1,
+    gap: spacing.sm,
+  },
   fieldsRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -30,6 +34,29 @@ export const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+  },
+  supersetBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxxs,
+  },
+  supersetToggle: {
+    borderWidth: border.thin,
+    borderRadius: radii.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  supersetToggleText: {
+    flex: 1,
+    gap: spacing.xxxs,
   },
   restControls: {
     flexDirection: 'row',

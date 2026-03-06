@@ -9,6 +9,7 @@ export type WorkoutExercise = {
   restSeconds: number;
   startWeightKg: number;
   overloadIncrementKg: number;
+  supersetWithNext: boolean;
   sortOrder: number;
 };
 
@@ -25,6 +26,7 @@ export type WorkoutSession = {
   id: string;
   workoutId: string;
   performedAt: number;
+  durationMs: number | null;
   bodyweightKg: number | null;
   sets: WorkoutSessionSet[];
 };
@@ -45,6 +47,7 @@ export type NewWorkoutExerciseInput = {
   restSeconds: number;
   startWeightKg: number;
   overloadIncrementKg: number;
+  supersetWithNext: boolean;
 };
 
 export type NewWorkoutInput = {
@@ -69,6 +72,7 @@ export type NewWorkoutSessionSetInput = {
 export type NewWorkoutSessionInput = {
   workoutId: string;
   performedAt?: number;
+  durationMs?: number | null;
   bodyweightKg?: number | null;
   sets: NewWorkoutSessionSetInput[];
 };
@@ -77,6 +81,7 @@ export type UpdateWorkoutSessionInput = {
   sessionId: string;
   workoutId: string;
   performedAt: number;
+  durationMs?: number | null;
   bodyweightKg?: number | null;
   sets: NewWorkoutSessionSetInput[];
 };
@@ -85,6 +90,8 @@ export type AppSettings = {
   themeId: ThemeId;
   weightUnit: WeightUnit;
 };
+
+export type ActiveWorkoutSetSupersetPosition = 'none' | 'lead' | 'trail';
 
 export type ActiveWorkoutSet = {
   id: string;
@@ -96,6 +103,9 @@ export type ActiveWorkoutSet = {
   actualWeightKg: number;
   restSeconds: number;
   actualReps: number;
+  supersetGroupId: string | null;
+  supersetPartnerExerciseName: string | null;
+  supersetPosition: ActiveWorkoutSetSupersetPosition;
 };
 
 export type ActiveWorkoutSession = {

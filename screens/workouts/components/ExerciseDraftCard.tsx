@@ -7,15 +7,14 @@ import { designTokens } from '@/constants/design-system';
 import { DEFAULT_REST_SECONDS, REST_TIMER_STEP_SECONDS } from '@/constants/workout';
 
 import { WEIGHT_KEYBOARD_TYPE } from '../constants';
-import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
-import type { ExerciseDraft } from '../types';
+import type { ExerciseDraft, WorkoutBuilderViewController } from '../types';
 import { clampRestSeconds, formatDuration, parseRestSecondsInput } from '../utils';
 import { styles } from './ExerciseDraftCard.styles';
 
 const { layout, opacity } = designTokens;
 
 type Props = {
-  controller: WorkoutsScreenController;
+  controller: WorkoutBuilderViewController;
   draft: ExerciseDraft;
 };
 

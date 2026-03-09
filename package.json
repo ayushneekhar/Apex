@@ -1,7 +1,7 @@
 {
   "name": "apex",
   "main": "index.js",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "scripts": {
     "start": "react-native start",
     "prebuild": "expo prebuild",
@@ -15,6 +15,14 @@
     "ios:release": "NODE_ENV=production expo run:ios --configuration Release",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "ad": "./scripts/agent-device.sh",
+    "ad:devices": "./scripts/agent-device.sh devices",
+    "ad:ios:boot": "./scripts/agent-device.sh boot --platform ios",
+    "ad:ios:open": "./scripts/agent-device.sh open com.neekhar.apex --platform ios",
+    "ad:ios:reinstall": "./scripts/agent-device-ios-reinstall.sh",
+    "ad:android:boot": "./scripts/agent-device.sh boot --platform android",
+    "ad:android:open": "./scripts/agent-device.sh open com.neekhar.apex --platform android",
+    "ad:android:reinstall": "./scripts/agent-device-android-reinstall.sh",
     "nitro-ota:build": "node scripts/ota/build-nitro-ota.mjs",
     "version:app:bump": "node scripts/version/bump-app-version.mjs"
   },
@@ -23,6 +31,7 @@
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/native": "^7.1.8",
+    "@react-navigation/native-stack": "^7.14.4",
     "expo": "~54.0.33",
     "expo-auth-session": "~7.0.10",
     "expo-blur": "~15.0.8",

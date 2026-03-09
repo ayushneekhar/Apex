@@ -6,7 +6,7 @@ import { NeonInput } from '@/components/ui/neon-input';
 import { designTokens } from '@/constants/design-system';
 import { EXERCISE_LIBRARY } from '@/constants/exercise-library';
 
-import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
+import type { WorkoutBuilderViewController } from '../types';
 import { ErrorNotice } from './common/ErrorNotice';
 import { ExerciseDraftCard } from './ExerciseDraftCard';
 import { styles } from './WorkoutBuilderPanel.styles';
@@ -16,7 +16,7 @@ const { opacity } = designTokens;
 export function WorkoutBuilderPanel({
   controller,
 }: {
-  controller: WorkoutsScreenController;
+  controller: WorkoutBuilderViewController;
 }) {
   const { theme } = controller;
 

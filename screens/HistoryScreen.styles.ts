@@ -2,7 +2,7 @@ import { StyleSheet } from 'react-native';
 
 import { designTokens } from '@/constants/design-system';
 
-const { border, layout, overlay, radii, sizes, spacing } = designTokens;
+const { border, layout, radii, sizes, spacing } = designTokens;
 const CALENDAR_COLUMN_WIDTH = '14.285714%';
 
 export const styles = StyleSheet.create({
@@ -114,77 +114,76 @@ export const styles = StyleSheet.create({
   },
   sessionCard: {
     borderWidth: border.thin,
-    borderRadius: radii.panel,
+    borderRadius: radii.card,
     padding: spacing.lg,
+    gap: spacing.lg,
+  },
+  sessionTopRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
     gap: spacing.md,
   },
-  sessionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  sessionDateBadge: {
+    width: 70,
+    borderWidth: border.thin,
+    borderRadius: radii.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xxs,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  sessionCardBody: {
+    flex: 1,
     gap: spacing.md,
+  },
+  sessionHeadlineRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    alignItems: 'flex-start',
   },
   sessionHeaderText: {
     flex: 1,
     gap: spacing.xxs,
   },
-  statChips: {
+  volumeBadge: {
+    borderWidth: border.thin,
+    borderRadius: radii.xl,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    gap: spacing.xxs,
+    minWidth: 110,
+  },
+  statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  statChip: {
+  statCard: {
+    width: '48%',
+    minHeight: 78,
     borderWidth: border.thin,
-    borderRadius: radii.pill,
-    paddingVertical: spacing.xs,
+    borderRadius: radii.xl,
     paddingHorizontal: spacing.md,
-    minWidth: sizes.chipMinWidth,
+    paddingVertical: spacing.sm,
     gap: spacing.xxs,
+  },
+  sessionFooterRow: {
+    gap: spacing.sm,
+  },
+  sessionFooterText: {
+    gap: spacing.xxs,
+  },
+  bodyweightBadge: {
+    borderWidth: border.thin,
+    borderRadius: radii.xl,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    gap: spacing.xxs,
+  },
+  linkRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: overlay.modalBackdrop,
-    justifyContent: 'center',
-    paddingHorizontal: layout.screenHorizontalInset,
-  },
-  modalCard: {
-    borderWidth: border.thin,
-    borderRadius: radii.panel,
-    padding: spacing.xl,
-    gap: spacing.lg,
-    maxHeight: '84%',
-  },
-  modalSetList: {
-    maxHeight: sizes.modalSetListMaxHeight,
-  },
-  modalSetListContent: {
-    gap: spacing.sm,
-    paddingBottom: spacing.xxs,
-  },
-  modalSetCard: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  modalSetInputsRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  modalSetInputCell: {
-    flex: 1,
-  },
-  errorBox: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  modalActionCell: {
-    flex: 1,
+    gap: spacing.xs,
   },
 });

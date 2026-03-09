@@ -240,12 +240,12 @@ export function useWorkoutBuilderController({
 
     if (!trimmedWorkoutName) {
       setFormError("Give this workout a name before saving.");
-      return;
+      return false;
     }
 
     if (exerciseDrafts.length === 0) {
       setFormError("Add at least one exercise.");
-      return;
+      return false;
     }
 
     const parsedExercises: NewWorkoutExerciseInput[] = [];
@@ -258,12 +258,12 @@ export function useWorkoutBuilderController({
 
       if (!Number.isFinite(sets) || sets < 1) {
         setFormError(`Sets for ${draft.name} must be 1 or greater.`);
-        return;
+        return false;
       }
 
       if (!Number.isFinite(reps) || reps < 1) {
         setFormError(`Reps for ${draft.name} must be 1 or greater.`);
-        return;
+        return false;
       }
 
       if (
@@ -274,12 +274,12 @@ export function useWorkoutBuilderController({
         setFormError(
           `Rest timer for ${draft.name} must be between ${MIN_REST_SECONDS} and ${MAX_REST_SECONDS} seconds.`
         );
-        return;
+        return false;
       }
 
       if (startWeightKg === null) {
         setFormError(`Starting weight for ${draft.name} is invalid.`);
-        return;
+        return false;
       }
 
       const overloadValue = draft.overload.trim();
@@ -291,7 +291,7 @@ export function useWorkoutBuilderController({
         setFormError(
           `Progressive overload for ${draft.name} must be above zero.`
         );
-        return;
+        return false;
       }
 
       parsedExercises.push({
@@ -322,8 +322,10 @@ export function useWorkoutBuilderController({
       }
 
       closeComposer();
+      return true;
     } catch {
       setFormError("Could not save this workout template. Try again.");
+      return false;
     }
   }
 

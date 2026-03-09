@@ -13,6 +13,7 @@ import {
   NavigationContainer,
   type Theme,
 } from "@react-navigation/native";
+import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -40,13 +41,17 @@ import {
 } from "@/lib/nitro-ota";
 import AnalyticsScreen from "@/screens/AnalyticsScreen";
 import HistoryScreen from "@/screens/HistoryScreen";
+import SessionDetailScreen from "@/screens/SessionDetailScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import WorkoutTemplateEditorScreen from "@/screens/WorkoutTemplateEditorScreen";
 import WorkoutsScreen from "@/screens/WorkoutsScreen";
 import { useAppStore } from "@/store/use-app-store";
+import type { RootStackParamList } from "@/types/navigation";
 
 void SplashScreen.preventAutoHideAsync();
 
 const Tab = createBottomTabNavigator();
+const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 const APP_TABS = [
   {
@@ -76,14 +81,12 @@ const APP_TABS = [
 ] as const;
 
 function RootTabs({
-  navigationTheme,
   theme,
   updateCheck,
   updateBusy,
   onDismissUpdate,
   onApplyUpdate,
 }: {
-  navigationTheme: Theme;
   theme: AppTheme;
   updateCheck: NitroOtaUpdateCheck | null;
   updateBusy: boolean;
@@ -95,92 +98,90 @@ function RootTabs({
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.palette.background }}>
-      <NavigationContainer theme={navigationTheme}>
-        <Tab.Navigator
-          initialRouteName="Workouts"
-          detachInactiveScreens={false}
-          screenOptions={createTabScreenOptions(theme, insets)}
+      <Tab.Navigator
+        initialRouteName="Workouts"
+        detachInactiveScreens={false}
+        screenOptions={createTabScreenOptions(theme, insets)}
+      >
+        {APP_TABS.map((screen) => (
+          <Tab.Screen
+            key={screen.name}
+            name={screen.name}
+            component={screen.component}
+            listeners={
+              screen.hapticOnPress
+                ? {
+                    tabPress: triggerSelectionHaptic,
+                  }
+                : undefined
+            }
+            options={{
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name={screen.iconName} size={size} color={color} />
+              ),
+            }}
+          />
+        ))}
+      </Tab.Navigator>
+
+      {showUpdatePrompt ? (
+        <View
+          style={[
+            styles.updatePrompt,
+            {
+              left: designTokens.layout.screenHorizontalInset,
+              right: designTokens.layout.screenHorizontalInset,
+              bottom:
+                insets.bottom +
+                designTokens.sizes.tabBarBaseHeight +
+                designTokens.spacing.md,
+              borderColor: theme.palette.border,
+              backgroundColor: theme.palette.panel,
+            },
+          ]}
         >
-          {APP_TABS.map((screen) => (
-            <Tab.Screen
-              key={screen.name}
-              name={screen.name}
-              component={screen.component}
-              listeners={
-                screen.hapticOnPress
-                  ? {
-                      tabPress: triggerSelectionHaptic,
-                    }
-                  : undefined
-              }
-              options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons name={screen.iconName} size={size} color={color} />
-                ),
-              }}
-            />
-          ))}
-        </Tab.Navigator>
-
-        {showUpdatePrompt ? (
-          <View
-            style={[
-              styles.updatePrompt,
-              {
-                left: designTokens.layout.screenHorizontalInset,
-                right: designTokens.layout.screenHorizontalInset,
-                bottom:
-                  insets.bottom +
-                  designTokens.sizes.tabBarBaseHeight +
-                  designTokens.spacing.md,
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <AppText variant="label">New App Update Available</AppText>
-            <AppText tone="muted">Would you like to update now?</AppText>
-            <View style={styles.updatePromptActions}>
-              <Pressable
-                onPress={onDismissUpdate}
-                style={({ pressed }) => [
-                  styles.updatePromptButton,
-                  {
-                    borderColor: theme.palette.border,
-                    opacity: pressed ? designTokens.opacity.pressedSoft : 1,
-                  },
-                ]}
-              >
-                <AppText variant="label" tone="muted">
-                  Later
-                </AppText>
-              </Pressable>
-              <Pressable
-                onPress={onApplyUpdate}
-                disabled={updateBusy}
-                style={({ pressed }) => [
-                  styles.updatePromptButton,
-                  {
-                    borderColor: theme.palette.accent,
-                    backgroundColor: theme.palette.accent,
-                    opacity: updateBusy
-                      ? designTokens.opacity.disabled
-                      : pressed
-                      ? designTokens.opacity.pressedSoft
-                      : 1,
-                  },
-                ]}
-              >
-                <AppText variant="label" tone="inverse">
-                  {updateBusy ? "Updating..." : "Update"}
-                </AppText>
-              </Pressable>
-            </View>
+          <AppText variant="label">New App Update Available</AppText>
+          <AppText tone="muted">Would you like to update now?</AppText>
+          <View style={styles.updatePromptActions}>
+            <Pressable
+              onPress={onDismissUpdate}
+              style={({ pressed }) => [
+                styles.updatePromptButton,
+                {
+                  borderColor: theme.palette.border,
+                  opacity: pressed ? designTokens.opacity.pressedSoft : 1,
+                },
+              ]}
+            >
+              <AppText variant="label" tone="muted">
+                Later
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={onApplyUpdate}
+              disabled={updateBusy}
+              style={({ pressed }) => [
+                styles.updatePromptButton,
+                {
+                  borderColor: theme.palette.accent,
+                  backgroundColor: theme.palette.accent,
+                  opacity: updateBusy
+                    ? designTokens.opacity.disabled
+                    : pressed
+                    ? designTokens.opacity.pressedSoft
+                    : 1,
+                },
+              ]}
+            >
+              <AppText variant="label" tone="inverse">
+                {updateBusy ? "Updating..." : "Update"}
+              </AppText>
+            </Pressable>
           </View>
-        ) : null}
+        </View>
+      ) : null}
 
-        <StatusBar style={theme.statusBarStyle} />
-      </NavigationContainer>
+      <StatusBar style={theme.statusBarStyle} />
     </View>
   );
 }
@@ -307,16 +308,39 @@ export default function App() {
     >
       <KeyboardProvider>
         <SafeAreaProvider>
-          <RootTabs
-            navigationTheme={navigationTheme}
-            theme={theme}
-            updateCheck={updateCheck}
-            updateBusy={updateBusy}
-            onDismissUpdate={handleDismissUpdate}
-            onApplyUpdate={() => {
-              void handleApplyUpdate();
-            }}
-          />
+          <NavigationContainer theme={navigationTheme}>
+            <RootStack.Navigator
+              initialRouteName="Tabs"
+              screenOptions={{
+                headerShown: false,
+                contentStyle: {
+                  backgroundColor: theme.palette.background,
+                },
+              }}
+            >
+              <RootStack.Screen name="Tabs">
+                {() => (
+                  <RootTabs
+                    theme={theme}
+                    updateCheck={updateCheck}
+                    updateBusy={updateBusy}
+                    onDismissUpdate={handleDismissUpdate}
+                    onApplyUpdate={() => {
+                      void handleApplyUpdate();
+                    }}
+                  />
+                )}
+              </RootStack.Screen>
+              <RootStack.Screen
+                name="SessionDetails"
+                component={SessionDetailScreen}
+              />
+              <RootStack.Screen
+                name="WorkoutTemplateEditor"
+                component={WorkoutTemplateEditorScreen}
+              />
+            </RootStack.Navigator>
+          </NavigationContainer>
         </SafeAreaProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>

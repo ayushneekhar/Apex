@@ -1,11 +1,14 @@
 import { useCallback, useState, type ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
 import { OverloadButton } from '@/components/ui/overload-button';
 import { designTokens } from '@/constants/design-system';
+import type { RootStackParamList } from '@/types/navigation';
 import type { Workout } from '@/types/workout';
 
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
@@ -21,6 +24,8 @@ type Props = {
 
 export function SavedWorkoutCard({ controller, workout }: Props) {
   const { theme, activeSession } = controller;
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isApplyingOverload, setIsApplyingOverload] = useState(false);
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
   const supersetPairCount =
@@ -72,7 +77,9 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
     >
       <Pressable
         onPress={() => {
-          void controller.beginWorkout(workout.id);
+          navigation.navigate('WorkoutTemplateEditor', {
+            workoutId: workout.id,
+          });
         }}
         style={({ pressed }) => [{ opacity: pressed ? opacity.pressedStrong : 1, gap: spacing.lg }]}
       >
@@ -85,23 +92,6 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
           </View>
 
           <View style={styles.headerActions}>
-            <Pressable
-              onPress={(event) => {
-                event.stopPropagation();
-                controller.openComposerForEdit(workout);
-              }}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.iconButton,
-                {
-                  borderColor: theme.palette.border,
-                  backgroundColor: theme.palette.panelSoft,
-                  opacity: pressed ? opacity.pressedSoft : 1,
-                },
-              ]}
-            >
-              <Ionicons name="create-outline" size={layout.screenTopInset} color={theme.palette.accent} />
-            </Pressable>
             <Pressable
               onPress={(event) => {
                 event.stopPropagation();
@@ -144,6 +134,17 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
             ? `Last completed on ${controller.sessionDateFormatter.format(new Date(lastSession.performedAt))}`
             : 'No completed sessions yet.'}
         </AppText>
+
+        <View style={styles.editorLinkRow}>
+          <AppText variant="label" tone="accent">
+            Open template editor
+          </AppText>
+          <Ionicons
+            name="arrow-forward"
+            size={16}
+            color={theme.palette.accent}
+          />
+        </View>
       </Pressable>
 
       <View style={styles.actionRow}>

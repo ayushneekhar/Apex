@@ -2,7 +2,7 @@
   "expo": {
     "name": "Apex",
     "slug": "Apex",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "apex",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.neekhar.apex",
-      "buildNumber": "1"
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +23,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.neekhar.apex",
-      "versionCode": 3
+      "versionCode": 4
     },
     "web": {
       "output": "static",

@@ -54,4 +54,9 @@ export const styles = StyleSheet.create({
   actionButtonCell: {
     flex: 1,
   },
+  editorLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
 });

@@ -17,6 +17,7 @@ export function createExerciseDraft(name: string): ExerciseDraft {
     restSeconds: String(DEFAULT_REST_SECONDS),
     startWeight: '0',
     overload: '',
+    supersetWithNext: false,
   };
 }
 
@@ -50,31 +51,44 @@ export function estimateWorkoutMinutes(workout: Workout): number {
 export function groupActiveSetsByExercise(sets: ActiveWorkoutSet[]): ActiveSetGroup[] {
   const groups = new Map<string, ActiveSetGroup>();
   const order: string[] = [];
+  const exerciseNameById = new Map<string, string>();
 
   sets.forEach((setEntry) => {
-    const existing = groups.get(setEntry.exerciseName);
+    exerciseNameById.set(setEntry.workoutExerciseId, setEntry.exerciseName);
+    const existing = groups.get(setEntry.workoutExerciseId);
 
     if (existing) {
       existing.sets.push(setEntry);
       return;
     }
 
-    groups.set(setEntry.exerciseName, {
+    groups.set(setEntry.workoutExerciseId, {
+      workoutExerciseId: setEntry.workoutExerciseId,
       exerciseName: setEntry.exerciseName,
+      sortOrder: setEntry.sortOrder,
       targetWeightKg: setEntry.targetWeightKg,
       restSeconds: setEntry.restSeconds,
+      supersetExerciseId: setEntry.supersetExerciseId,
+      supersetExerciseName: null,
       sets: [setEntry],
     });
-    order.push(setEntry.exerciseName);
+    order.push(setEntry.workoutExerciseId);
   });
 
-  return order.map((exerciseName) => {
-    const group = groups.get(exerciseName);
+  return order.map((workoutExerciseId) => {
+    const group = groups.get(workoutExerciseId);
 
     return {
-      exerciseName,
+      workoutExerciseId,
+      exerciseName: group?.exerciseName ?? '',
+      sortOrder: group?.sortOrder ?? 0,
       targetWeightKg: group?.targetWeightKg ?? 0,
       restSeconds: group?.restSeconds ?? DEFAULT_REST_SECONDS,
+      supersetExerciseId: group?.supersetExerciseId ?? null,
+      supersetExerciseName:
+        group?.supersetExerciseId
+          ? exerciseNameById.get(group.supersetExerciseId) ?? null
+          : null,
       sets: [...(group?.sets ?? [])].sort((a, b) => a.setNumber - b.setNumber),
     };
   });

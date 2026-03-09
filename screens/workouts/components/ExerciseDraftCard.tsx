@@ -24,6 +24,12 @@ export function ExerciseDraftCard({ controller, draft }: Props) {
   const parsedRestSeconds = parseRestSecondsInput(draft.restSeconds);
   const restSeconds =
     parsedRestSeconds === null ? DEFAULT_REST_SECONDS : clampRestSeconds(parsedRestSeconds);
+  const draftIndex = controller.exerciseDrafts.findIndex((item) => item.id === draft.id);
+  const canMoveUp = draftIndex > 0;
+  const canMoveDown = draftIndex >= 0 && draftIndex < controller.exerciseDrafts.length - 1;
+  const supersetPartner = draft.supersetWithNext
+    ? controller.exerciseDrafts[draftIndex + 1]?.name ?? null
+    : null;
 
   return (
     <View
@@ -37,17 +43,47 @@ export function ExerciseDraftCard({ controller, draft }: Props) {
     >
       <View style={styles.header}>
         <AppText variant="heading">{draft.name}</AppText>
-        <Pressable
-          onPress={() => controller.removeExerciseDraft(draft.id)}
-          hitSlop={8}
-          style={({ pressed }) => ({ opacity: pressed ? opacity.pressedMedium : 1 })}
-        >
-          <Ionicons
-            name="close"
-            size={layout.screenTopInset}
-            color={theme.palette.textMuted}
-          />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => controller.moveExerciseDraft(draft.id, 'up')}
+            disabled={!canMoveUp}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              opacity: !canMoveUp ? opacity.disabled : pressed ? opacity.pressedMedium : 1,
+            })}
+          >
+            <Ionicons
+              name="arrow-up"
+              size={layout.screenTopInset}
+              color={canMoveUp ? theme.palette.textMuted : `${theme.palette.textMuted}66`}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => controller.moveExerciseDraft(draft.id, 'down')}
+            disabled={!canMoveDown}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              opacity: !canMoveDown ? opacity.disabled : pressed ? opacity.pressedMedium : 1,
+            })}
+          >
+            <Ionicons
+              name="arrow-down"
+              size={layout.screenTopInset}
+              color={canMoveDown ? theme.palette.textMuted : `${theme.palette.textMuted}66`}
+            />
+          </Pressable>
+          <Pressable
+            onPress={() => controller.removeExerciseDraft(draft.id)}
+            hitSlop={8}
+            style={({ pressed }) => ({ opacity: pressed ? opacity.pressedMedium : 1 })}
+          >
+            <Ionicons
+              name="close"
+              size={layout.screenTopInset}
+              color={theme.palette.textMuted}
+            />
+          </Pressable>
+        </View>
       </View>
 
       <View style={styles.fieldsRow}>
@@ -106,7 +142,7 @@ export function ExerciseDraftCard({ controller, draft }: Props) {
 
       <View
         style={[
-          styles.restRow,
+          styles.utilityCard,
           {
             borderColor: theme.palette.border,
             backgroundColor: theme.palette.panel,
@@ -148,6 +184,59 @@ export function ExerciseDraftCard({ controller, draft }: Props) {
           </Pressable>
         </View>
       </View>
+
+      <Pressable
+        onPress={() => {
+          controller.clearFormError();
+          controller.toggleDraftSupersetWithNext(draft.id);
+        }}
+        disabled={!canMoveDown}
+        style={({ pressed }) => [
+          styles.utilityCard,
+          {
+            borderColor: draft.supersetWithNext
+              ? theme.palette.accent
+              : theme.palette.border,
+            backgroundColor: draft.supersetWithNext
+              ? `${theme.palette.accent}16`
+              : theme.palette.panel,
+            opacity: !canMoveDown
+              ? opacity.disabled
+              : pressed
+                ? opacity.pressedSoft
+                : 1,
+          },
+        ]}
+      >
+        <View style={styles.supersetHeader}>
+          <View style={styles.supersetTitleRow}>
+            <Ionicons
+              name="git-compare"
+              size={16}
+              color={
+                draft.supersetWithNext
+                  ? theme.palette.accent
+                  : theme.palette.textMuted
+              }
+            />
+            <AppText variant="label" tone={draft.supersetWithNext ? 'accent' : 'primary'}>
+              Superset Next Exercise
+            </AppText>
+          </View>
+          <Ionicons
+            name={draft.supersetWithNext ? 'checkmark-circle' : 'add-circle-outline'}
+            size={18}
+            color={draft.supersetWithNext ? theme.palette.accent : theme.palette.textMuted}
+          />
+        </View>
+        <AppText variant="micro" tone="muted">
+          {canMoveDown
+            ? draft.supersetWithNext && supersetPartner
+              ? `Linked with ${supersetPartner}.`
+              : `Pair ${draft.name} with ${controller.exerciseDrafts[draftIndex + 1]?.name ?? 'the next exercise'}.`
+            : 'Move another exercise below this one to create a superset pair.'}
+        </AppText>
+      </Pressable>
     </View>
   );
 }

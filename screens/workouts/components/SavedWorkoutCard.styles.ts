@@ -39,6 +39,9 @@ export const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
     borderWidth: border.thin,
     borderRadius: radii.pill,
     paddingVertical: spacing.xs,

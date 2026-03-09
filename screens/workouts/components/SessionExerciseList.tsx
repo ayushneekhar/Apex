@@ -28,15 +28,17 @@ export function SessionExerciseList({
 
   return (
     <>
-      {controller.groupedActiveSets.map((group, groupIndex) => {
+      {controller.groupedActiveSets.map((group) => {
         const groupIsAssisted = isAssistedWeightKg(group.targetWeightKg);
         const completedSetCount = group.sets.filter((setEntry) => setEntry.actualReps > 0).length;
         const groupCompleted = group.sets.length > 0 && completedSetCount === group.sets.length;
-        const isCurrentGroup = !groupCompleted && groupIndex === 0;
+        const isCurrentGroup =
+          !groupCompleted &&
+          group.workoutExerciseId === activeSession.currentExerciseId;
 
         return (
           <Animated.View
-            key={group.exerciseName}
+            key={group.workoutExerciseId}
             layout={exerciseCardLayoutTransition}
             style={[
               styles.exerciseCard,
@@ -60,6 +62,13 @@ export function SessionExerciseList({
                       name="arrow-down-circle"
                       size={16}
                       color={theme.palette.accentSecondary}
+                    />
+                  ) : null}
+                  {group.supersetExerciseId ? (
+                    <Ionicons
+                      name="git-compare"
+                      size={16}
+                      color={theme.palette.accent}
                     />
                   ) : null}
                 </View>
@@ -98,7 +107,9 @@ export function SessionExerciseList({
               </View>
               <AppText variant="micro" tone="muted">
                 Target {formatWeightFromKg(Math.abs(group.targetWeightKg), settings.weightUnit)}
-                {groupIsAssisted ? ' assisted' : ''} {' • '}Rest {formatDuration(group.restSeconds * 1000)}
+                {groupIsAssisted ? ' assisted' : ''}
+                {group.supersetExerciseName ? ` • Superset with ${group.supersetExerciseName}` : ''}
+                {' • '}Rest {formatDuration(group.restSeconds * 1000)}
               </AppText>
             </View>
 

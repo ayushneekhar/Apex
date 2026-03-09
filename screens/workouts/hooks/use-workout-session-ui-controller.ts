@@ -66,11 +66,23 @@ export function useWorkoutSessionUiController({
             return a.isCompleted ? 1 : -1;
           }
 
+          const activeCurrentExerciseId = activeSession?.currentExerciseId;
+          const aIsCurrent = a.group.workoutExerciseId === activeCurrentExerciseId;
+          const bIsCurrent = b.group.workoutExerciseId === activeCurrentExerciseId;
+
+          if (aIsCurrent !== bIsCurrent) {
+            return aIsCurrent ? -1 : 1;
+          }
+
+          if (a.group.sortOrder !== b.group.sortOrder) {
+            return a.group.sortOrder - b.group.sortOrder;
+          }
+
           return a.index - b.index;
         })
         .map(({ group }) => group);
     },
-    [activeSession?.sets]
+    [activeSession?.currentExerciseId, activeSession?.sets]
   );
 
   const completedSetCount = useMemo(

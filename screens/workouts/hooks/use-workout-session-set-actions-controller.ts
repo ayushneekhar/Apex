@@ -25,7 +25,12 @@ type SessionSetActionsDeps = {
   now: number;
   setSessionActionError: (value: string | null) => void;
   closeSessionScreen: () => void;
-  decrementOrCompleteSessionSet: (setId: string) => Promise<void>;
+  decrementOrCompleteSessionSet: (
+    setId: string
+  ) => Promise<{
+    shouldStartRest: boolean;
+    restSet: ActiveWorkoutSet | null;
+  }>;
   setSessionSetCustomValues: (
     setId: string,
     reps: number,
@@ -305,15 +310,13 @@ export function useWorkoutSessionSetActionsController({
   }
 
   async function handleSetPress(setEntry: ActiveWorkoutSet) {
-    const shouldStartRest = setEntry.actualReps === 0;
-
     try {
-      await decrementOrCompleteSessionSet(setEntry.id);
+      const result = await decrementOrCompleteSessionSet(setEntry.id);
       setSessionActionError(null);
 
-      if (shouldStartRest) {
+      if (result.shouldStartRest && result.restSet) {
         triggerSuccessHaptic();
-        await startRestTimer(setEntry);
+        await startRestTimer(result.restSet);
         return;
       }
     } catch {

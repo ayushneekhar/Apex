@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, View } from 'react-native';
 
@@ -23,6 +23,18 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
   const { theme, activeSession } = controller;
   const [isApplyingOverload, setIsApplyingOverload] = useState(false);
   const totalSets = workout.exercises.reduce((sum, exercise) => sum + exercise.sets, 0);
+  const supersetPairCount =
+    workout.exercises.filter((exercise) => {
+      if (!exercise.supersetExerciseId) {
+        return false;
+      }
+
+      const partner = workout.exercises.find(
+        (candidate) => candidate.id === exercise.supersetExerciseId
+      );
+
+      return partner !== undefined && exercise.sortOrder < partner.sortOrder;
+    }).length;
   const lastSession = workout.sessions[0];
   const sessionBlocked = activeSession !== null && activeSession.workoutId !== workout.id;
   const startButtonTitle = activeSession?.workoutId === workout.id ? 'Continue' : 'Start';
@@ -118,6 +130,13 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
           <MetaChip controller={controller} label={`${workout.exercises.length} exercises`} />
           <MetaChip controller={controller} label={`${totalSets} sets`} />
           <MetaChip controller={controller} label={`~${estimateWorkoutMinutes(workout)} min`} />
+          {supersetPairCount > 0 ? (
+            <MetaChip
+              controller={controller}
+              icon="git-compare"
+              label={`${supersetPairCount} superset${supersetPairCount === 1 ? '' : 's'}`}
+            />
+          ) : null}
         </View>
 
         <AppText tone="muted">
@@ -148,7 +167,15 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
   );
 }
 
-function MetaChip({ controller, label }: { controller: WorkoutsScreenController; label: string }) {
+function MetaChip({
+  controller,
+  label,
+  icon,
+}: {
+  controller: WorkoutsScreenController;
+  label: string;
+  icon?: ComponentProps<typeof Ionicons>['name'];
+}) {
   const { theme } = controller;
 
   return (
@@ -161,6 +188,7 @@ function MetaChip({ controller, label }: { controller: WorkoutsScreenController;
         },
       ]}
     >
+      {icon ? <Ionicons name={icon} size={12} color={theme.palette.textMuted} /> : null}
       <AppText variant="micro" tone="muted">
         {label}
       </AppText>

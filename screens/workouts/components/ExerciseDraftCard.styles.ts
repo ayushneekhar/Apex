@@ -17,6 +17,11 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   fieldsRow: {
     flexDirection: 'row',
     gap: spacing.md,
@@ -24,7 +29,7 @@ export const styles = StyleSheet.create({
   fieldCell: {
     flex: 1,
   },
-  restRow: {
+  utilityCard: {
     borderWidth: border.thin,
     borderRadius: radii.xl,
     paddingHorizontal: spacing.md,
@@ -47,5 +52,17 @@ export const styles = StyleSheet.create({
   restValue: {
     flex: 1,
     alignItems: 'center',
+  },
+  supersetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  supersetTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    flexShrink: 1,
   },
 });

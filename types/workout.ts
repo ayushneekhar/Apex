@@ -10,6 +10,7 @@ export type WorkoutExercise = {
   startWeightKg: number;
   overloadIncrementKg: number;
   sortOrder: number;
+  supersetExerciseId: string | null;
 };
 
 export type WorkoutSessionSet = {
@@ -25,6 +26,7 @@ export type WorkoutSession = {
   id: string;
   workoutId: string;
   performedAt: number;
+  durationMs: number | null;
   bodyweightKg: number | null;
   sets: WorkoutSessionSet[];
 };
@@ -45,6 +47,7 @@ export type NewWorkoutExerciseInput = {
   restSeconds: number;
   startWeightKg: number;
   overloadIncrementKg: number;
+  supersetWithNext: boolean;
 };
 
 export type NewWorkoutInput = {
@@ -69,6 +72,7 @@ export type NewWorkoutSessionSetInput = {
 export type NewWorkoutSessionInput = {
   workoutId: string;
   performedAt?: number;
+  durationMs?: number | null;
   bodyweightKg?: number | null;
   sets: NewWorkoutSessionSetInput[];
 };
@@ -77,6 +81,7 @@ export type UpdateWorkoutSessionInput = {
   sessionId: string;
   workoutId: string;
   performedAt: number;
+  durationMs?: number | null;
   bodyweightKg?: number | null;
   sets: NewWorkoutSessionSetInput[];
 };
@@ -90,12 +95,14 @@ export type ActiveWorkoutSet = {
   id: string;
   workoutExerciseId: string;
   exerciseName: string;
+  sortOrder: number;
   setNumber: number;
   targetReps: number;
   targetWeightKg: number;
   actualWeightKg: number;
   restSeconds: number;
   actualReps: number;
+  supersetExerciseId: string | null;
 };
 
 export type ActiveWorkoutSession = {
@@ -107,5 +114,6 @@ export type ActiveWorkoutSession = {
   pauseStartedAt: number | null;
   isPaused: boolean;
   restoredFromAppClose: boolean;
+  currentExerciseId: string | null;
   sets: ActiveWorkoutSet[];
 };

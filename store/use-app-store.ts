@@ -64,7 +64,10 @@ type AppStoreState = {
   setActiveWorkoutBodyweight: (bodyweightKg: number | null) => Promise<void>;
   pauseActiveWorkoutSession: () => Promise<void>;
   resumeActiveWorkoutSession: () => Promise<void>;
-  decrementOrCompleteSessionSet: (setId: string) => Promise<void>;
+  decrementOrCompleteSessionSet: (setId: string) => Promise<{
+    shouldStartRest: boolean;
+    restSet: ActiveWorkoutSet | null;
+  }>;
   setSessionSetCustomValues: (
     setId: string,
     reps: number,
@@ -105,6 +108,68 @@ function getSessionSetNameLookupKey(exerciseName: string, setNumber: number): st
   return `${exerciseName.trim().toLowerCase()}:${setNumber}`;
 }
 
+function getExerciseCompletionCount(session: ActiveWorkoutSession, workoutExerciseId: string): number {
+  return session.sets.filter(
+    (setEntry) =>
+      setEntry.workoutExerciseId === workoutExerciseId && setEntry.actualReps > 0
+  ).length;
+}
+
+function getFirstPendingExerciseId(session: ActiveWorkoutSession): string | null {
+  const orderedExerciseIds = Array.from(
+    new Map(
+      session.sets
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map((setEntry) => [setEntry.workoutExerciseId, setEntry.sortOrder])
+    ).keys()
+  );
+
+  for (const exerciseId of orderedExerciseIds) {
+    const hasPendingSet = session.sets.some(
+      (setEntry) =>
+        setEntry.workoutExerciseId === exerciseId && setEntry.actualReps === 0
+    );
+
+    if (hasPendingSet) {
+      return exerciseId;
+    }
+  }
+
+  return null;
+}
+
+function getNextCurrentExerciseIdAfterCompletion(
+  session: ActiveWorkoutSession,
+  completedSet: ActiveWorkoutSet
+): string | null {
+  const supersetExerciseId = completedSet.supersetExerciseId;
+
+  if (!supersetExerciseId) {
+    return getFirstPendingExerciseId(session);
+  }
+
+  const completedCount = getExerciseCompletionCount(
+    session,
+    completedSet.workoutExerciseId
+  );
+  const supersetCompletedCount = getExerciseCompletionCount(
+    session,
+    supersetExerciseId
+  );
+  const supersetHasPendingSet = session.sets.some(
+    (setEntry) =>
+      setEntry.workoutExerciseId === supersetExerciseId &&
+      setEntry.actualReps === 0
+  );
+
+  if (supersetHasPendingSet && completedCount > supersetCompletedCount) {
+    return supersetExerciseId;
+  }
+
+  return getFirstPendingExerciseId(session);
+}
+
 function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
   const mostRecentSession = getMostRecentWorkoutSession(workout);
   const lastSessionWeightByExerciseSet = new Map<string, number>();
@@ -139,12 +204,14 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
         id: createId('active_set'),
         workoutExerciseId: exercise.id,
         exerciseName: exercise.name,
+        sortOrder: exercise.sortOrder,
         setNumber,
         targetReps: exercise.reps,
         targetWeightKg,
         actualWeightKg,
         restSeconds: exercise.restSeconds,
         actualReps: 0,
+        supersetExerciseId: exercise.supersetExerciseId,
       };
     });
   });
@@ -177,6 +244,10 @@ function elapsedPauseMs(session: ActiveWorkoutSession, now: number): number {
   }
 
   return Math.max(0, now - session.pauseStartedAt);
+}
+
+function getElapsedSessionMs(session: ActiveWorkoutSession, now: number): number {
+  return Math.max(0, now - session.startedAt - session.totalPausedMs - elapsedPauseMs(session, now));
 }
 
 function pauseSession(session: ActiveWorkoutSession, now: number): ActiveWorkoutSession {
@@ -228,6 +299,16 @@ async function loadPersistedState(): Promise<PersistedState> {
     activeSession = {
       ...pauseSession(activeSession, Date.now()),
       restoredFromAppClose: true,
+      currentExerciseId:
+        activeSession.currentExerciseId ?? getFirstPendingExerciseId(activeSession),
+    };
+    await saveActiveWorkoutSession(activeSession);
+  }
+
+  if (activeSession && activeSession.currentExerciseId === null) {
+    activeSession = {
+      ...activeSession,
+      currentExerciseId: getFirstPendingExerciseId(activeSession),
     };
     await saveActiveWorkoutSession(activeSession);
   }
@@ -501,6 +582,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       pauseStartedAt: null,
       isPaused: false,
       restoredFromAppClose: false,
+      currentExerciseId: workout.exercises[0]?.id ?? null,
       sets: buildSessionSets(workout),
     };
 
@@ -556,10 +638,17 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   decrementOrCompleteSessionSet: async (setId) => {
     const session = get().activeSession;
     if (!session) {
-      return;
+      return {
+        shouldStartRest: false,
+        restSet: null,
+      };
     }
 
     let changed = false;
+    let completedSet: ActiveWorkoutSet | null = null;
+    let completedSupersetExerciseId: string | null = null;
+    let decrementedExerciseId: string | null = null;
+    let shouldStartRest = false;
     const nextSets = session.sets.map((setEntry) => {
       if (setEntry.id !== setId) {
         return setEntry;
@@ -568,11 +657,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       changed = true;
 
       if (setEntry.actualReps === 0) {
-        return {
+        completedSet = {
           ...setEntry,
           actualReps: setEntry.targetReps,
         };
+        completedSupersetExerciseId = setEntry.supersetExerciseId;
+        shouldStartRest = true;
+        return completedSet;
       }
+
+      decrementedExerciseId = setEntry.workoutExerciseId;
 
       return {
         ...setEntry,
@@ -581,16 +675,37 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     });
 
     if (!changed) {
-      return;
+      return {
+        shouldStartRest: false,
+        restSet: null,
+      };
     }
 
-    const nextSession = {
+    const updatedSession = {
       ...session,
       sets: nextSets,
+    };
+    const nextSession = {
+      ...updatedSession,
+      currentExerciseId:
+        completedSet && shouldStartRest
+          ? getNextCurrentExerciseIdAfterCompletion(updatedSession, completedSet)
+          : decrementedExerciseId ??
+            updatedSession.currentExerciseId ??
+            getFirstPendingExerciseId(updatedSession),
     };
 
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
+
+    const shouldSkipRestForSuperset =
+      completedSupersetExerciseId !== null &&
+      nextSession.currentExerciseId === completedSupersetExerciseId;
+
+    return {
+      shouldStartRest: shouldStartRest && !shouldSkipRestForSuperset,
+      restSet: completedSet,
+    };
   },
   setSessionSetCustomValues: async (setId, reps, weightKg, weightScope = "current") => {
     const session = get().activeSession;
@@ -669,9 +784,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     set({ mutating: true, error: null });
 
     try {
+      const finishedAt = Date.now();
+
       await createWorkoutSession({
         workoutId: session.workoutId,
-        performedAt: Date.now(),
+        performedAt: finishedAt,
+        durationMs: getElapsedSessionMs(session, finishedAt),
         bodyweightKg: session.bodyweightKg,
         sets: session.sets.map((setEntry) => ({
           workoutExerciseId: setEntry.workoutExerciseId,

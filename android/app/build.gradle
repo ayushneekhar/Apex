@@ -2,12 +2,22 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+import groovy.json.JsonSlurper
 import java.io.FileInputStream
 import java.util.Properties
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
+def appConfigFile = rootProject.file("../app.json")
+def appConfig = appConfigFile.exists() ? new JsonSlurper().parse(appConfigFile) : [:]
+def expoConfig = appConfig?.expo instanceof Map ? appConfig.expo : [:]
+def expoAndroidConfig = expoConfig?.android instanceof Map ? expoConfig.android : [:]
+def resolvedVersionName = String.valueOf(expoConfig?.version ?: "1.0.0")
+def resolvedVersionCode =
+    expoAndroidConfig?.versionCode instanceof Number
+        ? expoAndroidConfig.versionCode.intValue()
+        : Integer.parseInt(String.valueOf(expoAndroidConfig?.versionCode ?: "1"))
 
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
@@ -101,8 +111,8 @@ android {
         applicationId 'com.neekhar.apex'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.0.0"
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }

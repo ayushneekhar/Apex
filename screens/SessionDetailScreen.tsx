@@ -206,7 +206,12 @@ export default function SessionDetailScreen() {
         bodyweightKg: parsedBodyweight,
         sets: parsedSets,
       });
-      navigation.goBack();
+      // Defer navigation to let the store update settle before unmounting
+      requestAnimationFrame(() => {
+        if (navigation.canGoBack()) {
+          navigation.goBack();
+        }
+      });
     } catch {
       setEditError('Could not save session edits right now.');
     }

@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
@@ -12,24 +11,7 @@ export function TrackerHeroCard({
 }: {
   controller: WorkoutsScreenController;
 }) {
-  const { compactHero, isComposerOpen, defaultOverload, openComposer, closeComposer, theme, lastCompletedWorkout, sessionDateFormatter } = controller;
-
-  const lastWorkoutTag = lastCompletedWorkout ? (
-    <View
-      style={[
-        styles.lastWorkoutTag,
-        {
-          borderColor: theme.palette.border,
-          backgroundColor: theme.palette.panelSoft,
-        },
-      ]}
-    >
-      <Ionicons name="arrow-back-circle-outline" size={14} color={theme.palette.textMuted} />
-      <AppText variant="micro" tone="muted">
-        Previous: {lastCompletedWorkout.name} ({sessionDateFormatter.format(new Date(lastCompletedWorkout.performedAt))})
-      </AppText>
-    </View>
-  ) : null;
+  const { compactHero, isComposerOpen, defaultOverload, openComposer, closeComposer, theme } = controller;
 
   return (
     <View
@@ -48,7 +30,6 @@ export function TrackerHeroCard({
               WORKOUT TRACKER
             </AppText>
             <AppText variant="heading">Workouts ready</AppText>
-            {lastWorkoutTag}
           </View>
           <NeonButton
             title={isComposerOpen ? 'Close builder' : 'Add workout'}
@@ -66,7 +47,6 @@ export function TrackerHeroCard({
             Create workouts, then start a focused session with live timer and set tracking. Default overload is{' '}
             {defaultOverload}.
           </AppText>
-          {lastWorkoutTag}
           <NeonButton
             title={isComposerOpen ? 'Close builder' : 'Add workout'}
             variant={isComposerOpen ? 'ghost' : 'primary'}

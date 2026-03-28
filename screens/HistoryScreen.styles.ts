@@ -115,8 +115,8 @@ export const styles = StyleSheet.create({
   sessionCard: {
     borderWidth: border.thin,
     borderRadius: radii.card,
-    padding: spacing.lg,
-    gap: spacing.lg,
+    padding: spacing.sm,
+    gap: spacing.sm,
   },
   sessionTopRow: {
     flexDirection: 'row',
@@ -126,7 +126,10 @@ export const styles = StyleSheet.create({
   sessionDateBadge: {
     width: 70,
     borderWidth: border.thin,
-    borderRadius: radii.xl,
+    borderTopLeftRadius: radii.xl,
+    borderBottomLeftRadius: radii.xl,
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xxs,

@@ -36,7 +36,7 @@ function toPercentChange(start: number, end: number, sampleCount: number): strin
     return 'N/A';
   }
 
-  const delta = ((end - start) / start) * 100;
+  const delta = ((end - start) / Math.abs(start)) * 100;
   const roundedDelta = Number(delta.toFixed(1));
 
   if (Math.abs(roundedDelta) === 0) {
@@ -119,7 +119,16 @@ function MetricLineChart({
     };
   });
   const chartData: lineDataItem[] = baseData;
-  const peakValue = Math.max(...chartData.map((point) => point.value ?? 0), 1);
+  const allValues = chartData.map((point) => point.value ?? 0);
+  const peakValue = Math.max(...allValues, 0);
+  const minValue = Math.min(...allValues, 0);
+  const hasNegativeValues = minValue < 0;
+  const computedMaxValue = hasNegativeValues
+    ? Math.ceil(Math.max(peakValue, Math.abs(minValue) * 0.1) * 1.08) || 1
+    : Math.ceil(peakValue * 1.08);
+  const computedMostNegativeValue = hasNegativeValues
+    ? Math.floor(minValue * 1.08)
+    : undefined;
 
   return (
     <View style={styles.chartWrap}>
@@ -132,7 +141,8 @@ function MetricLineChart({
         data={chartData}
         height={188}
         noOfSections={4}
-        maxValue={Math.ceil(peakValue * 1.08)}
+        maxValue={computedMaxValue}
+        mostNegativeValue={computedMostNegativeValue}
         thickness={3}
         color={lineColor}
         startFillColor={lineColor}
@@ -219,7 +229,7 @@ export default function AnalyticsScreen() {
         }
 
         const existing = byExercise.get(setEntry.exerciseName);
-        const weighted = Math.abs(setEntry.weightKg) * setEntry.reps;
+        const weighted = setEntry.weightKg * setEntry.reps;
 
         if (existing) {
           existing.weightedKg += weighted;
@@ -437,8 +447,8 @@ export default function AnalyticsScreen() {
                     Change:{' '}
                     {exerciseCard.startValueKg !== null && exerciseCard.latestValueKg !== null
                       ? toPercentChange(
-                          Math.abs(exerciseCard.startValueKg),
-                          Math.abs(exerciseCard.latestValueKg),
+                          exerciseCard.startValueKg,
+                          exerciseCard.latestValueKg,
                           exerciseCard.sampleCount,
                         )
                       : 'N/A'}

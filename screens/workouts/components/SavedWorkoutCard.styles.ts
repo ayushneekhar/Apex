@@ -21,6 +21,21 @@ export const styles = StyleSheet.create({
     flex: 1,
     gap: spacing.xxs,
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexWrap: 'wrap',
+  },
+  previousBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxxs,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    paddingVertical: spacing.xxxs,
+    paddingHorizontal: spacing.sm,
+  },
   headerActions: {
     flexDirection: 'row',
     gap: spacing.sm,

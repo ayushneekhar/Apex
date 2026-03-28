@@ -54,6 +54,9 @@ public class AppDelegate: ExpoAppDelegate {
 }
 
 class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
+  private let nitroOtaPreferencesSuiteName = "NitroOtaPrefs"
+  private let nitroOtaBinaryFingerprintKey = "apex_nitro_ota_last_seen_binary_fingerprint"
+
   // Extension point for config-plugins
 
   override func sourceURL(for bridge: RCTBridge) -> URL? {
@@ -65,11 +68,61 @@ class ReactNativeDelegate: ExpoReactNativeFactoryDelegate {
 #if DEBUG
     return RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: ".expo/.virtual-metro-entry")
 #else
+    resetNitroOtaForBinaryChangeIfNeeded()
+
     if let bundleURL = NitroOtaBundleManager.shared.getStoredBundleURL() {
       return bundleURL
     }
 
     return Bundle.main.url(forResource: "main", withExtension: "jsbundle")
 #endif
+  }
+
+  private func resetNitroOtaForBinaryChangeIfNeeded() {
+    let defaults = UserDefaults(suiteName: nitroOtaPreferencesSuiteName) ?? .standard
+    let currentFingerprint = currentBinaryFingerprint()
+    let previousFingerprint = defaults.string(forKey: nitroOtaBinaryFingerprintKey)
+
+    if previousFingerprint == currentFingerprint {
+      return
+    }
+
+    NitroOtaBundleManager.shared.clearStoredData()
+    clearNitroOtaBundleDirectories()
+    defaults.set(currentFingerprint, forKey: nitroOtaBinaryFingerprintKey)
+    defaults.synchronize()
+  }
+
+  private func currentBinaryFingerprint() -> String {
+    let shortVersion =
+      Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+    let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
+
+    return "\(shortVersion)|\(buildNumber)"
+  }
+
+  private func clearNitroOtaBundleDirectories() {
+    let fileManager = FileManager.default
+
+    guard
+      let documentsDirectory = fileManager.urls(
+        for: .documentDirectory,
+        in: .userDomainMask
+      ).first
+    else {
+      return
+    }
+
+    let directoryURLs = (try? fileManager.contentsOfDirectory(
+      at: documentsDirectory,
+      includingPropertiesForKeys: [.isDirectoryKey],
+      options: [.skipsHiddenFiles]
+    )) ?? []
+
+    directoryURLs
+      .filter { $0.lastPathComponent.hasPrefix("ota_unzipped_") }
+      .forEach { url in
+        try? fileManager.removeItem(at: url)
+      }
   }
 }

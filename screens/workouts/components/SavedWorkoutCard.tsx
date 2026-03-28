@@ -23,7 +23,8 @@ type Props = {
 };
 
 export function SavedWorkoutCard({ controller, workout }: Props) {
-  const { theme, activeSession } = controller;
+  const { theme, activeSession, lastCompletedWorkout } = controller;
+  const isPreviousWorkout = lastCompletedWorkout?.workoutId === workout.id;
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isApplyingOverload, setIsApplyingOverload] = useState(false);
@@ -85,7 +86,25 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
       >
         <View style={styles.header}>
           <View style={styles.headerText}>
-            <AppText variant="heading">{workout.name}</AppText>
+            <View style={styles.headerTitleRow}>
+              <AppText variant="heading">{workout.name}</AppText>
+              {isPreviousWorkout ? (
+                <View
+                  style={[
+                    styles.previousBadge,
+                    {
+                      borderColor: `${theme.palette.accentSecondary}66`,
+                      backgroundColor: `${theme.palette.accentSecondary}18`,
+                    },
+                  ]}
+                >
+                  <Ionicons name="arrow-back-circle" size={12} color={theme.palette.accentSecondary} />
+                  <AppText variant="micro" style={{ color: theme.palette.accentSecondary }}>
+                    Previous
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
             <AppText variant="micro" tone="muted">
               Week {workout.weeksCompleted + 1} target
             </AppText>

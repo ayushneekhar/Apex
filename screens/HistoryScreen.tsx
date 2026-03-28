@@ -584,12 +584,6 @@ export default function HistoryScreen() {
                   </View>
 
                   <View style={styles.sessionFooterRow}>
-                    <View style={styles.sessionFooterText}>
-                      <AppText variant="micro" tone="muted">
-                        Exercise Preview
-                      </AppText>
-                      <AppText numberOfLines={1}>{getExercisePreview(item.session)}</AppText>
-                    </View>
                     <View
                       style={[
                         styles.bodyweightBadge,

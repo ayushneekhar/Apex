@@ -1,7 +1,10 @@
 package com.neekhar.apex
 
 import android.app.Application
+import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.content.res.Configuration
+import android.os.Build
 import java.io.File
 
 import com.facebook.react.PackageList
@@ -21,6 +24,8 @@ import expo.modules.ApplicationLifecycleDispatcher
 import expo.modules.ReactNativeHostWrapper
 
 class MainApplication : Application(), ReactApplication {
+  private val nitroOtaPreferencesSuiteName = "NitroOtaPrefs"
+  private val nitroOtaBinaryFingerprintKey = "apex_nitro_ota_last_seen_binary_fingerprint"
 
   override val reactNativeHost: ReactNativeHost = ReactNativeHostWrapper(
       this,
@@ -63,6 +68,9 @@ class MainApplication : Application(), ReactApplication {
   private fun getSafeNitroOtaBundlePath(): String? {
     CrashHandler.install(this)
 
+    val sharedPreferences = getSharedPreferences(nitroOtaPreferencesSuiteName, MODE_PRIVATE)
+    resetNitroOtaForBinaryChangeIfNeeded(sharedPreferences)
+
     val preferences = PreferencesUtils.create(this)
     val storedPath = preferences.getOtaUnzippedPath()
 
@@ -77,6 +85,76 @@ class MainApplication : Application(), ReactApplication {
 
     clearNitroOtaCacheAfterMissingBundle(preferences, storedPath)
     return null
+  }
+
+  private fun resetNitroOtaForBinaryChangeIfNeeded(sharedPreferences: SharedPreferences) {
+    val currentFingerprint = getCurrentBinaryFingerprint()
+    val previousFingerprint = sharedPreferences.getString(nitroOtaBinaryFingerprintKey, null)
+
+    if (previousFingerprint == currentFingerprint) {
+      return
+    }
+
+    clearNitroOtaCache(sharedPreferences)
+    sharedPreferences.edit().putString(nitroOtaBinaryFingerprintKey, currentFingerprint).apply()
+  }
+
+  private fun getCurrentBinaryFingerprint(): String {
+    return try {
+      val packageInfo = packageManager.getPackageInfo(packageName, 0)
+      val versionName = packageInfo.versionName ?: "unknown"
+      val versionCode =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+          packageInfo.longVersionCode
+        } else {
+          @Suppress("DEPRECATION")
+          packageInfo.versionCode.toLong()
+        }
+      val lastUpdateTime = packageInfo.lastUpdateTime
+
+      "$versionName|$versionCode|$lastUpdateTime"
+    } catch (_: PackageManager.NameNotFoundException) {
+      "unknown"
+    }
+  }
+
+  private fun clearNitroOtaCache(sharedPreferences: SharedPreferences) {
+    clearNitroOtaPreferenceKeys(sharedPreferences)
+
+    try {
+      val otaDirs = filesDir.listFiles { file ->
+        file.isDirectory && file.name.startsWith("ota_unzipped_")
+      } ?: emptyArray()
+
+      otaDirs.forEach { dir ->
+        runCatching { dir.deleteRecursively() }
+      }
+    } catch (_: Exception) {
+      // Continue startup even if cleanup is partial.
+    }
+  }
+
+  private fun clearNitroOtaPreferenceKeys(sharedPreferences: SharedPreferences) {
+    val otaKeyPrefixes = listOf(
+      "ota_unzipped_path_",
+      "ota_version_",
+      "ota_update_download_url_",
+      "ota_update_version_check_url_",
+      "ota_bundle_name_",
+      "ota_previous_unzipped_path_",
+      "ota_previous_version_",
+      "ota_rollback_count_",
+      "ota_blacklisted_versions_",
+      "ota_rollback_history_",
+      "ota_pending_validation_",
+      "ota_notified_rollback_count_"
+    )
+
+    val editor = sharedPreferences.edit()
+    sharedPreferences.all.keys
+      .filter { key -> otaKeyPrefixes.any(key::startsWith) }
+      .forEach(editor::remove)
+    editor.apply()
   }
 
   private fun clearNitroOtaCacheAfterMissingBundle(

@@ -181,7 +181,7 @@ jobs:
             fs.writeFileSync('${COUNTER_FILE}', JSON.stringify(data, null, 2) + '\n');
           "
 
-          OTA_VERSION="0.0.${NEXT}"
+          OTA_VERSION="${NEXT}"
           echo "ota_version=${OTA_VERSION}" >> "$GITHUB_OUTPUT"
           echo "OTA bundle version: ${OTA_VERSION} (counter: ${CURRENT} → ${NEXT})"
 

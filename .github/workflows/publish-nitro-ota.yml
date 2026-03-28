@@ -93,11 +93,13 @@ jobs:
           if [[ "$APP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
             MAJOR="${BASH_REMATCH[1]}"
             MINOR="${BASH_REMATCH[2]}"
+            PATCH="${BASH_REMATCH[3]}"
           else
             MAJOR="0"
             MINOR="0"
+            PATCH="0"
           fi
-          PATCH_COMPONENT=$((RUN_NUMBER * 100 + RUN_ATTEMPT))
+          PATCH_COMPONENT=$((PATCH * 10000 + RUN_NUMBER * 10 + RUN_ATTEMPT))
           OTA_VERSION="${MAJOR}.${MINOR}.${PATCH_COMPONENT}"
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then

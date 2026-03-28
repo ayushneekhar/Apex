@@ -22,15 +22,14 @@
 
 ## 📱 Screenshots
 
-<!-- Add your screenshots here in a table layout -->
 <p align="center">
-  <img src="" width="200" alt="Workouts" />
+  <img src="assets/screenshots/workouts.jpeg" width="200" alt="Workouts" />
   &nbsp;&nbsp;
-  <img src="" width="200" alt="Active Session" />
+  <img src="assets/screenshots/active-workout.jpeg" width="200" alt="Active Workout" />
   &nbsp;&nbsp;
-  <img src="" width="200" alt="Analytics" />
+  <img src="assets/screenshots/analytics.jpeg" width="200" alt="Analytics" />
   &nbsp;&nbsp;
-  <img src="" width="200" alt="History" />
+  <img src="assets/screenshots/history.jpeg" width="200" alt="History" />
 </p>
 
 ---

@@ -88,13 +88,10 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          echo "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/apex-upload-key.jks
-          cat > android/keystore.properties <<PROPS
-          storeFile=app/apex-upload-key.jks
-          storePassword=${ANDROID_KEYSTORE_PASSWORD}
-          keyAlias=${ANDROID_KEY_ALIAS}
-          keyPassword=${ANDROID_KEY_PASSWORD}
-          PROPS
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 -d > android/app/apex-upload-key.jks
+          printf 'storeFile=app/apex-upload-key.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "${ANDROID_KEYSTORE_PASSWORD}" "${ANDROID_KEY_ALIAS}" "${ANDROID_KEY_PASSWORD}" \
+            > android/keystore.properties
 
       - name: Validate required environment variables
         shell: bash

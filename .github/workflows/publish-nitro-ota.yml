@@ -6,6 +6,7 @@ on:
       - main
     paths-ignore:
       - ".github/workflows/**"
+      - "scripts/ota/ota-bundle-version.json"
   workflow_dispatch:
     inputs:
       deployment_environment:
@@ -52,7 +53,7 @@ jobs:
       skip_reason: ${{ steps.prepare.outputs.skip_reason }}
       deployment_environment: ${{ steps.prepare.outputs.deployment_environment }}
       platforms_json: ${{ steps.prepare.outputs.platforms_json }}
-      ota_version: ${{ steps.prepare.outputs.ota_version }}
+      ota_version: ${{ steps.ota_version.outputs.ota_version }}
       target_app_version: ${{ steps.prepare.outputs.target_app_version }}
       release_notes: ${{ steps.prepare.outputs.release_notes }}
     steps:
@@ -68,8 +69,6 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           BEFORE_SHA: ${{ github.event.before }}
           HEAD_SHA: ${{ github.sha }}
-          RUN_NUMBER: ${{ github.run_number }}
-          RUN_ATTEMPT: ${{ github.run_attempt }}
           INPUT_DEPLOYMENT_ENVIRONMENT: ${{ inputs.deployment_environment }}
           INPUT_PLATFORM: ${{ inputs.platform }}
           INPUT_TARGET_APP_VERSION: ${{ inputs.target_app_version }}
@@ -90,22 +89,9 @@ jobs:
           APP_VERSION="$(node -p "require('./app.json').expo.version")"
           write_output "target_app_version" "${INPUT_TARGET_APP_VERSION:-$APP_VERSION}"
 
-          if [[ "$APP_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-            MAJOR="${BASH_REMATCH[1]}"
-            MINOR="${BASH_REMATCH[2]}"
-            PATCH="${BASH_REMATCH[3]}"
-          else
-            MAJOR="0"
-            MINOR="0"
-            PATCH="0"
-          fi
-          PATCH_COMPONENT=$((PATCH * 10000 + RUN_NUMBER * 10 + RUN_ATTEMPT))
-          OTA_VERSION="${MAJOR}.${MINOR}.${PATCH_COMPONENT}"
-
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             write_output "deployment_environment" "${INPUT_DEPLOYMENT_ENVIRONMENT}"
             write_output "platforms_json" "[\"${INPUT_PLATFORM}\"]"
-            write_output "ota_version" "${OTA_VERSION}"
             write_output "release_notes" "${INPUT_RELEASE_NOTES}"
             write_output "skip_reason" ""
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
@@ -114,8 +100,6 @@ jobs:
 
           write_output "deployment_environment" "production"
           write_output "platforms_json" "[\"android\",\"ios\"]"
-
-          write_output "ota_version" "$OTA_VERSION"
           write_output "release_notes" "Auto OTA from main (${HEAD_SHA:0:7})"
 
           ZERO_SHA="0000000000000000000000000000000000000000"
@@ -131,7 +115,6 @@ jobs:
               echo "## Nitro OTA Auto Publish"
               echo "No diff base SHA found for this push; proceeding without native-change gating."
               echo "- Target app version: ${APP_VERSION}"
-              echo "- OTA version: ${OTA_VERSION}"
             } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -176,8 +159,38 @@ jobs:
             echo "## Nitro OTA Auto Publish"
             echo "No native-related file changes detected between ${BASE_SHA:0:7} and ${HEAD_SHA:0:7}."
             echo "- Target app version: ${APP_VERSION}"
-            echo "- OTA version: ${OTA_VERSION}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Resolve OTA bundle version
+        id: ota_version
+        if: steps.prepare.outputs.should_publish == 'true'
+        shell: bash
+        env:
+          DEPLOYMENT_ENVIRONMENT: ${{ steps.prepare.outputs.deployment_environment }}
+        run: |
+          set -euo pipefail
+
+          COUNTER_FILE="scripts/ota/ota-bundle-version.json"
+          CURRENT="$(node -p "JSON.parse(require('fs').readFileSync('${COUNTER_FILE}','utf8'))['${DEPLOYMENT_ENVIRONMENT}'] || 0")"
+          NEXT=$((CURRENT + 1))
+
+          node -e "
+            const fs = require('fs');
+            const data = JSON.parse(fs.readFileSync('${COUNTER_FILE}', 'utf8'));
+            data['${DEPLOYMENT_ENVIRONMENT}'] = ${NEXT};
+            fs.writeFileSync('${COUNTER_FILE}', JSON.stringify(data, null, 2) + '\n');
+          "
+
+          OTA_VERSION="0.0.${NEXT}"
+          echo "ota_version=${OTA_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "OTA bundle version: ${OTA_VERSION} (counter: ${CURRENT} → ${NEXT})"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "${COUNTER_FILE}"
+          git commit -m "chore(ota): bump ${DEPLOYMENT_ENVIRONMENT} bundle version to ${NEXT} [skip ci]"
+          git pull --rebase origin main
+          git push origin main
 
   publish:
     needs: prepare

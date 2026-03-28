@@ -15,9 +15,10 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency block here — the router (triage) is fast and
+# downstream workflows manage their own concurrency:
+#   - APK build: queues (never cancels a running build)
+#   - OTA publish: cancels previous (only latest JS matters)
 
 jobs:
   # ── Triage: what kind of change is this? ─────────────────────

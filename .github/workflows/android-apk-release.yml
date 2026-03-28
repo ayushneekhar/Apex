@@ -28,7 +28,7 @@ permissions:
 
 concurrency:
   group: android-apk-release-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false   # NEVER cancel a running native build — queue instead
 
 jobs:
   # ── Build APK + create GitHub release ──────────────────────────

@@ -15,10 +15,11 @@ on:
 permissions:
   contents: write
 
-# No concurrency block here — the router (triage) is fast and
-# downstream workflows manage their own concurrency:
-#   - APK build: queues (never cancels a running build)
-#   - OTA publish: cancels previous (only latest JS matters)
+# All CI runs share one queue — an OTA push will wait for a
+# running native build to finish before starting.
+concurrency:
+  group: ci-main
+  cancel-in-progress: false
 
 jobs:
   # ── Triage: what kind of change is this? ─────────────────────

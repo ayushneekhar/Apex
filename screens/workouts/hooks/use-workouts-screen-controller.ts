@@ -96,6 +96,20 @@ export function useWorkoutsScreenController() {
   const compactHero = workouts.length > 0 && !builder.isComposerOpen;
   const moveTrackerCardToBottom = workouts.length > 1;
 
+  const lastCompletedWorkout = useMemo(() => {
+    let latest: { name: string; performedAt: number } | null = null;
+
+    workouts.forEach((workout) => {
+      workout.sessions.forEach((session) => {
+        if (!latest || session.performedAt > latest.performedAt) {
+          latest = { name: workout.name, performedAt: session.performedAt };
+        }
+      });
+    });
+
+    return latest as { name: string; performedAt: number } | null;
+  }, [workouts]);
+
   async function beginWorkout(workoutId: string) {
     builder.clearFormError();
     await sessionUi.beginWorkout(workoutId);
@@ -121,6 +135,7 @@ export function useWorkoutsScreenController() {
 
     compactHero,
     moveTrackerCardToBottom,
+    lastCompletedWorkout,
 
     applyWeeklyOverload,
     removeWorkout,

@@ -103,6 +103,7 @@ export type ActiveWorkoutSet = {
   restSeconds: number;
   actualReps: number;
   supersetExerciseId: string | null;
+  completedAt: number | null;
 };
 
 export type ActiveWorkoutSession = {

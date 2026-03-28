@@ -21,4 +21,14 @@ export const styles = StyleSheet.create({
   compactHeroTextWrap: {
     gap: spacing.xxs,
   },
+  lastWorkoutTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: border.thin,
+    borderRadius: radii.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xxs,
+    alignSelf: 'flex-start',
+  },
 });

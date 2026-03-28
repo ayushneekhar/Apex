@@ -145,26 +145,35 @@ function getNextCurrentExerciseIdAfterCompletion(
 ): string | null {
   const supersetExerciseId = completedSet.supersetExerciseId;
 
-  if (!supersetExerciseId) {
-    return getFirstPendingExerciseId(session);
+  if (supersetExerciseId) {
+    const completedCount = getExerciseCompletionCount(
+      session,
+      completedSet.workoutExerciseId
+    );
+    const supersetCompletedCount = getExerciseCompletionCount(
+      session,
+      supersetExerciseId
+    );
+    const supersetHasPendingSet = session.sets.some(
+      (setEntry) =>
+        setEntry.workoutExerciseId === supersetExerciseId &&
+        setEntry.actualReps === 0
+    );
+
+    if (supersetHasPendingSet && completedCount > supersetCompletedCount) {
+      return supersetExerciseId;
+    }
   }
 
-  const completedCount = getExerciseCompletionCount(
-    session,
-    completedSet.workoutExerciseId
-  );
-  const supersetCompletedCount = getExerciseCompletionCount(
-    session,
-    supersetExerciseId
-  );
-  const supersetHasPendingSet = session.sets.some(
+  // Stay on the exercise the user just interacted with if it still has pending sets
+  const exerciseStillPending = session.sets.some(
     (setEntry) =>
-      setEntry.workoutExerciseId === supersetExerciseId &&
+      setEntry.workoutExerciseId === completedSet.workoutExerciseId &&
       setEntry.actualReps === 0
   );
 
-  if (supersetHasPendingSet && completedCount > supersetCompletedCount) {
-    return supersetExerciseId;
+  if (exerciseStillPending) {
+    return completedSet.workoutExerciseId;
   }
 
   return getFirstPendingExerciseId(session);
@@ -212,6 +221,7 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
         restSeconds: exercise.restSeconds,
         actualReps: 0,
         supersetExerciseId: exercise.supersetExerciseId,
+        completedAt: null,
       };
     });
   });
@@ -660,6 +670,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         completedSet = {
           ...setEntry,
           actualReps: setEntry.targetReps,
+          completedAt: Date.now(),
         };
         completedSupersetExerciseId = setEntry.supersetExerciseId;
         shouldStartRest = true;
@@ -668,9 +679,11 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
       decrementedExerciseId = setEntry.workoutExerciseId;
 
+      const nextReps = Math.max(0, setEntry.actualReps - 1);
       return {
         ...setEntry,
-        actualReps: Math.max(0, setEntry.actualReps - 1),
+        actualReps: nextReps,
+        completedAt: nextReps === 0 ? null : setEntry.completedAt,
       };
     });
 
@@ -746,10 +759,16 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         return setEntry;
       }
 
+      const nextReps = isSelectedSet ? normalizedReps : setEntry.actualReps;
+      const wasCompleted = setEntry.actualReps > 0;
+      const nowCompleted = nextReps > 0;
       const nextSet = {
         ...setEntry,
-        actualReps: isSelectedSet ? normalizedReps : setEntry.actualReps,
+        actualReps: nextReps,
         actualWeightKg: applyWeight ? normalizedWeightKg : setEntry.actualWeightKg,
+        completedAt: isSelectedSet
+          ? (nowCompleted ? (wasCompleted ? setEntry.completedAt : Date.now()) : null)
+          : setEntry.completedAt,
       };
 
       if (
@@ -791,13 +810,25 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         performedAt: finishedAt,
         durationMs: getElapsedSessionMs(session, finishedAt),
         bodyweightKg: session.bodyweightKg,
-        sets: session.sets.map((setEntry) => ({
-          workoutExerciseId: setEntry.workoutExerciseId,
-          exerciseName: setEntry.exerciseName,
-          setNumber: setEntry.setNumber,
-          reps: setEntry.actualReps,
-          weightKg: setEntry.actualWeightKg,
-        })),
+        sets: session.sets
+          .slice()
+          .sort((a, b) => {
+            // Completed sets first, ordered by completion time
+            if (a.completedAt !== null && b.completedAt !== null) {
+              return a.completedAt - b.completedAt;
+            }
+            if (a.completedAt !== null) return -1;
+            if (b.completedAt !== null) return 1;
+            // Incomplete sets keep template order
+            return a.sortOrder - b.sortOrder || a.setNumber - b.setNumber;
+          })
+          .map((setEntry) => ({
+            workoutExerciseId: setEntry.workoutExerciseId,
+            exerciseName: setEntry.exerciseName,
+            setNumber: setEntry.setNumber,
+            reps: setEntry.actualReps,
+            weightKg: setEntry.actualWeightKg,
+          })),
       });
 
       const workouts = await listWorkouts();

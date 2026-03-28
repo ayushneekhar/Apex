@@ -66,6 +66,15 @@ export function useWorkoutSessionUiController({
             return a.isCompleted ? 1 : -1;
           }
 
+          if (a.isCompleted && b.isCompleted) {
+            // Sort completed exercises by the time their first set was completed
+            const aFirstCompleted = Math.min(...a.group.sets.filter((s) => s.completedAt !== null).map((s) => s.completedAt!));
+            const bFirstCompleted = Math.min(...b.group.sets.filter((s) => s.completedAt !== null).map((s) => s.completedAt!));
+            if (Number.isFinite(aFirstCompleted) && Number.isFinite(bFirstCompleted) && aFirstCompleted !== bFirstCompleted) {
+              return aFirstCompleted - bFirstCompleted;
+            }
+          }
+
           if (!a.isCompleted && !b.isCompleted) {
             const activeCurrentExerciseId = activeSession?.currentExerciseId;
             const aIsCurrent = a.group.workoutExerciseId === activeCurrentExerciseId;

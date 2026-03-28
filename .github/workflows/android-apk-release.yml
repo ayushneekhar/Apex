@@ -1,13 +1,16 @@
 name: Android APK Release
 
 on:
+  # Called by ci.yml when native changes are detected
+  workflow_call:
+  # Manual trigger for on-demand builds
   workflow_dispatch:
     inputs:
       build_environment:
         description: GitHub Environment to load secrets/vars from
         type: choice
         required: true
-        default: development
+        default: production
         options:
           - development
           - production
@@ -15,23 +18,24 @@ on:
         description: APK flavor to build
         type: choice
         required: true
-        default: development
+        default: production
         options:
           - development
           - production
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-release-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ── Build APK + create GitHub release ──────────────────────────
   build-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    environment: ${{ inputs.build_environment }}
+    environment: ${{ inputs.build_environment || 'production' }}
     env:
       EXPO_PUBLIC_SPOTIFY_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_SPOTIFY_CLIENT_ID }}
       EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID }}
@@ -44,6 +48,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -78,20 +84,45 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${EXPO_PUBLIC_SPOTIFY_CLIENT_ID}" ]; then
-            echo "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID for '${{ inputs.build_environment }}' environment." >&2
+            echo "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID for environment." >&2
             exit 1
           fi
           if [ -z "${EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID}" ]; then
-            echo "Missing EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID for '${{ inputs.build_environment }}' environment." >&2
+            echo "Missing EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID for environment." >&2
             exit 1
           fi
+
+      # ── Resolve version & tag ────────────────────────────────
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_VERSION=$(node -p "require('./app.json').expo.version")
+          VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode")
+          echo "app_version=${APP_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_code=${VERSION_CODE}" >> "$GITHUB_OUTPUT"
+
+          # Determine build type
+          BUILD_TYPE="${{ inputs.build_type || 'production' }}"
+          echo "build_type=${BUILD_TYPE}" >> "$GITHUB_OUTPUT"
+
+          # Build the tag name
+          TAG="v${APP_VERSION}+${VERSION_CODE}"
+
+          # Check if this tag already exists; if so, add a run-number suffix
+          if git tag -l "$TAG" | grep -q .; then
+            TAG="${TAG}.${GITHUB_RUN_NUMBER}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       - name: Build APK
         shell: bash
         run: |
           set -euo pipefail
+          BUILD_TYPE="${{ steps.version.outputs.build_type }}"
 
-          if [ "${{ inputs.build_type }}" = "production" ]; then
+          if [ "${BUILD_TYPE}" = "production" ]; then
             echo "Building production APK (assembleRelease)"
             yarn android:apk:release
           else
@@ -104,7 +135,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ inputs.build_type }}" = "production" ]; then
+          BUILD_TYPE="${{ steps.version.outputs.build_type }}"
+
+          if [ "${BUILD_TYPE}" = "production" ]; then
             SEARCH_DIR="android/app/build/outputs/apk/release"
           else
             SEARCH_DIR="android/app/build/outputs/apk/debug"
@@ -115,46 +148,109 @@ jobs:
             echo "No APK found in ${SEARCH_DIR}" >&2
             exit 1
           fi
-          echo "path=${APK_PATH}" >> "$GITHUB_OUTPUT"
-          echo "name=$(basename "${APK_PATH}")" >> "$GITHUB_OUTPUT"
+
+          # Rename to a friendly name
+          FRIENDLY_NAME="Apex-v${{ steps.version.outputs.app_version }}-${{ steps.version.outputs.build_type }}.apk"
+          cp "${APK_PATH}" "${FRIENDLY_NAME}"
+
+          echo "path=${FRIENDLY_NAME}" >> "$GITHUB_OUTPUT"
+          echo "name=${FRIENDLY_NAME}" >> "$GITHUB_OUTPUT"
 
       - name: Upload APK artifact
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: apex-android-apk-${{ inputs.build_type }}-${{ github.run_number }}
+          name: apex-android-apk-${{ steps.version.outputs.build_type }}-${{ github.run_number }}
           path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
           retention-days: 14
 
+      # ── Create GitHub Release with tag ────────────────────────
+      - name: Create Git tag
+        run: |
+          git tag "${{ steps.version.outputs.tag }}"
+          git push origin "${{ steps.version.outputs.tag }}"
+
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          APP_VERSION="${{ steps.version.outputs.app_version }}"
+          VERSION_CODE="${{ steps.version.outputs.version_code }}"
+          BUILD_TYPE="${{ steps.version.outputs.build_type }}"
+
+          # Get previous tag for changelog
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -n 1 || true)
+
+          # Build commit log
+          if [ -n "${PREV_TAG}" ]; then
+            COMMITS=$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (\`%h\`)" --no-merges | head -50)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (\`%h\`)" --no-merges -20)
+          fi
+
+          cat > release_notes.md <<EOF
+          ## 📱 Apex ${APP_VERSION} (build ${VERSION_CODE})
+
+          **Build type:** \`${BUILD_TYPE}\`
+          **Branch:** \`${GITHUB_REF_NAME}\`
+
+          ### 📋 What's changed
+
+          ${COMMITS}
+
+          ### 📦 Installation
+
+          1. Download the \`.apk\` file below
+          2. Open it on your Android device
+          3. Allow installation from unknown sources if prompted
+          4. Enjoy! 🏋️
+
+          ---
+          *Built automatically from [\`${GITHUB_SHA::7}\`](https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA})*
+          EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "${{ steps.apk.outputs.path }}" \
+            --title "Apex ${{ steps.version.outputs.app_version }} (${{ steps.version.outputs.build_type }})" \
+            --notes-file release_notes.md \
+            --latest
+
+      # ── Notification ──────────────────────────────────────────
       - name: Post ntfy notification
+        if: always() && steps.apk.outcome == 'success'
         shell: bash
         env:
           NTFY_CHANNEL: apex-builds
-          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
           APK_FILE: ${{ steps.apk.outputs.name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_SHA: ${{ github.sha }}
           REF_NAME: ${{ github.ref_name }}
-          BUILD_TYPE: ${{ inputs.build_type }}
-          BUILD_ENVIRONMENT: ${{ inputs.build_environment }}
+          BUILD_TYPE: ${{ steps.version.outputs.build_type }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
           set -euo pipefail
           SHORT_SHA="${COMMIT_SHA::7}"
+          RELEASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
           MESSAGE=$(cat <<EOF
-          Apex Android APK build ready
+          Apex ${TAG} released! 🎉
           Build type: ${BUILD_TYPE}
-          Environment: ${BUILD_ENVIRONMENT}
           File: ${APK_FILE}
           Branch: ${REF_NAME}
           Commit: ${SHORT_SHA}
-          Download: ${ARTIFACT_URL}
+          Release: ${RELEASE_URL}
           Run: ${RUN_URL}
           EOF
           )
 
           curl --fail --silent --show-error \
-            -H "Title: Apex APK Build" \
-            -H "Tags: android,package" \
+            -H "Title: Apex Release ${TAG}" \
+            -H "Tags: android,rocket" \
             -d "${MESSAGE}" \
-            "https://ntfy.sh/${NTFY_CHANNEL}"
+            "https://ntfy.sh/${NTFY_CHANNEL}" || true

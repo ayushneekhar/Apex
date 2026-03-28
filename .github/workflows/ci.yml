@@ -1,0 +1,110 @@
+name: CI
+
+# ─────────────────────────────────────────────────────────────────
+# Single entry-point for every push to main.
+# Decides once whether the change is native or JS-only, then
+# dispatches to the correct downstream workflow.
+# ─────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "scripts/ota/ota-bundle-version.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Triage: what kind of change is this? ─────────────────────
+  triage:
+    runs-on: ubuntu-latest
+    outputs:
+      route: ${{ steps.decide.outputs.route }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Decide build route
+        id: decide
+        shell: bash
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          # Skip CI commits from bots
+          if echo "$COMMIT_MSG" | grep -qF '[skip ci]'; then
+            echo "route=skip" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping CI — commit message contains [skip ci]"
+            exit 0
+          fi
+
+          # Explicit [build] tag always forces native build
+          if echo "$COMMIT_MSG" | grep -qF '[build]'; then
+            echo "route=native" >> "$GITHUB_OUTPUT"
+            echo "::notice::Forced native build — commit message contains [build]"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          NATIVE_REGEX='^(android/|ios/|app\.json$|app\.config\.(js|ts|json|mjs|cjs)$|package\.json$|yarn\.lock$|package-lock\.json$|pnpm-lock\.yaml$|bun\.lockb?$)'
+          WORKFLOW_REGEX='^\.github/workflows/'
+
+          # Workflow-only changes → skip everything
+          NON_WORKFLOW=$(echo "$CHANGED" | grep -Ev "$WORKFLOW_REGEX" || true)
+          if [ -z "$NON_WORKFLOW" ]; then
+            echo "route=skip" >> "$GITHUB_OUTPUT"
+            echo "::notice::Only workflow files changed — skipping"
+            exit 0
+          fi
+
+          # Any native-relevant file → native build (includes OTA in that workflow)
+          if echo "$CHANGED" | grep -Eq "$NATIVE_REGEX"; then
+            echo "route=native" >> "$GITHUB_OUTPUT"
+            echo "::notice::Native-relevant changes detected → APK release"
+          else
+            echo "route=ota" >> "$GITHUB_OUTPUT"
+            echo "::notice::JS-only changes detected → OTA publish"
+          fi
+
+      - name: Summary
+        shell: bash
+        run: |
+          ROUTE="${{ steps.decide.outputs.route }}"
+          case "$ROUTE" in
+            native) ICON="🏗️"; DESC="Native APK build + GitHub Release" ;;
+            ota)    ICON="📡"; DESC="Nitro OTA bundle publish" ;;
+            skip)   ICON="⏭️"; DESC="Skipped (workflow-only or [skip ci])" ;;
+            *)      ICON="❓"; DESC="Unknown route: $ROUTE" ;;
+          esac
+          {
+            echo "## CI Triage ${ICON}"
+            echo ""
+            echo "**Route:** \`${ROUTE}\` — ${DESC}"
+            echo ""
+            echo "**Commit:** \`${GITHUB_SHA::7}\` — ${{ github.event.head_commit.message }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Native path: build APK + create GitHub release ───────────
+  native-release:
+    needs: triage
+    if: needs.triage.outputs.route == 'native'
+    uses: ./.github/workflows/android-apk-release.yml
+    secrets: inherit
+
+  # ── JS path: publish OTA bundle ──────────────────────────────
+  ota-publish:
+    needs: triage
+    if: needs.triage.outputs.route == 'ota'
+    uses: ./.github/workflows/publish-nitro-ota.yml
+    secrets: inherit

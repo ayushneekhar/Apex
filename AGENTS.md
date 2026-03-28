@@ -50,6 +50,18 @@ Wrapper behavior:
 - Keep logging off unless you are debugging a failure. Use `logs start` only when needed, then `logs stop`.
 - Close the session when done so the simulator/device is not left in an ambiguous state.
 
+## Commit message conventions for CI
+
+When committing changes that touch **native-relevant files** (`android/`, `ios/`, `package.json`, `yarn.lock`, `app.json`, `app.config.*`), include the `[build]` tag in the commit message to guarantee a native APK release is triggered. Example:
+
+```
+Update Android splash screen config [build]
+```
+
+The CI workflow also auto-detects native file changes, but including `[build]` acts as an explicit signal and ensures the build is never skipped.
+
+For **JS/TS-only changes**, do **not** include `[build]` — these are handled automatically by the Nitro OTA workflow and do not need a native rebuild.
+
 ## Apex-specific constraints
 
 - For iOS automation, boot or target a specific simulator explicitly, for example `--device "iPhone 17 Pro"`.

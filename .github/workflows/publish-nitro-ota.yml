@@ -1,12 +1,9 @@
 name: Publish Nitro OTA
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - ".github/workflows/**"
-      - "scripts/ota/ota-bundle-version.json"
+  # Called by ci.yml when JS-only changes are detected
+  workflow_call:
+  # Manual trigger for on-demand OTA publishes
   workflow_dispatch:
     inputs:
       deployment_environment:
@@ -102,62 +99,13 @@ jobs:
           write_output "platforms_json" "[\"android\",\"ios\"]"
           write_output "release_notes" "Auto OTA from main (${HEAD_SHA:0:7})"
 
-          ZERO_SHA="0000000000000000000000000000000000000000"
-          BASE_SHA="${BEFORE_SHA}"
-          if [ "$BASE_SHA" = "$ZERO_SHA" ] || ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
-            BASE_SHA="$(git rev-parse "${HEAD_SHA}^" 2>/dev/null || true)"
-          fi
-
-          if [ -z "$BASE_SHA" ]; then
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            write_output "skip_reason" ""
-            {
-              echo "## Nitro OTA Auto Publish"
-              echo "No diff base SHA found for this push; proceeding without native-change gating."
-              echo "- Target app version: ${APP_VERSION}"
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")"
-          WORKFLOW_CHANGE_REGEX='^\.github/workflows/'
-          NATIVE_CHANGE_REGEX='^(android/|ios/|app\.json$|app\.config\.(js|ts|json|mjs|cjs)$|package\.json$|yarn\.lock$|package-lock\.json$|pnpm-lock\.yaml$|bun\.lockb?$)'
-
-          if printf '%s\n' "$CHANGED_FILES" | grep -Eq "$WORKFLOW_CHANGE_REGEX"; then
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            write_output "skip_reason" "Workflow files changed in this push; skipping automatic Nitro OTA publish."
-            {
-              echo "## Nitro OTA Auto Publish Skipped"
-              echo "Workflow files changed between ${BASE_SHA:0:7} and ${HEAD_SHA:0:7}."
-              echo ""
-              echo "Changed files:"
-              echo '```'
-              printf '%s\n' "$CHANGED_FILES"
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
-          if printf '%s\n' "$CHANGED_FILES" | grep -Eq "$NATIVE_CHANGE_REGEX"; then
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            write_output "skip_reason" "Native-related files changed in this push; skipping automatic Nitro OTA publish."
-            {
-              echo "## Nitro OTA Auto Publish Skipped"
-              echo "Native-related files changed between ${BASE_SHA:0:7} and ${HEAD_SHA:0:7}."
-              echo ""
-              echo "Changed files:"
-              echo '```'
-              printf '%s\n' "$CHANGED_FILES"
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-
+          # When called via workflow_call from ci.yml, triage has
+          # already confirmed this is a JS-only change — publish.
           echo "should_publish=true" >> "$GITHUB_OUTPUT"
           write_output "skip_reason" ""
           {
             echo "## Nitro OTA Auto Publish"
-            echo "No native-related file changes detected between ${BASE_SHA:0:7} and ${HEAD_SHA:0:7}."
+            echo "Triggered by CI router for JS-only changes."
             echo "- Target app version: ${APP_VERSION}"
           } >> "$GITHUB_STEP_SUMMARY"
 

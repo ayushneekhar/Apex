@@ -1,115 +1,141 @@
-# Apex
+<p align="center">
+  <img src="assets/images/icon.png" width="120" height="120" alt="Apex icon" style="border-radius: 24px;" />
+</p>
 
-Bare React Native app with Expo Modules.
+<h1 align="center">Apex</h1>
 
-## Why this setup
+<p align="center">
+  <strong>Your personal strength training companion</strong><br/>
+  Track workouts · Visualize progress · Smash PRs
+</p>
 
-- Native `ios/` and `android/` projects are checked in.
-- App runtime uses standard React Native CLI commands.
-- Expo packages are still available through Expo Modules (`expo-sqlite`, `expo-image`, `expo-haptics`, etc.).
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.1.1-blue?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/platform-Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/react--native-0.81-61dafb?style=flat-square&logo=react" alt="React Native" />
+  <img src="https://img.shields.io/badge/expo-54-000020?style=flat-square&logo=expo" alt="Expo" />
+  <img src="https://img.shields.io/github/actions/workflow/status/ayushneekhar/Apex/android-apk-release.yml?style=flat-square&label=build" alt="Build Status" />
+  <img src="https://img.shields.io/github/v/release/ayushneekhar/Apex?style=flat-square&label=latest%20release" alt="Latest Release" />
+</p>
 
-## Development
+---
 
-1. Install dependencies
+## 📱 Screenshots
+
+<!-- Add your screenshots here in a table layout -->
+<p align="center">
+  <img src="" width="200" alt="Workouts" />
+  &nbsp;&nbsp;
+  <img src="" width="200" alt="Active Session" />
+  &nbsp;&nbsp;
+  <img src="" width="200" alt="Analytics" />
+  &nbsp;&nbsp;
+  <img src="" width="200" alt="History" />
+</p>
+
+---
+
+## 💪 What is Apex?
+
+Apex is a **clean, fast, and offline-first** workout tracker built for people who take strength training seriously. No subscriptions, no ads — just you and the iron.
+
+Create workout templates, track every set in real time, and watch your progress unfold through beautiful charts. Apex handles progressive overload automatically so you can focus on lifting.
+
+---
+
+## ✨ Features
+
+| | Feature | Description |
+|---|---|---|
+| 🏋️ | **Workout Templates** | Build reusable routines with exercises, sets, reps, and rest times |
+| ⏱️ | **Live Session Tracking** | Real-time set logging with rest timers and push notifications |
+| 📈 | **Progressive Overload** | Automatic weekly weight increases — just show up and lift |
+| 🔗 | **Supersets** | Pair exercises together for efficient training |
+| 📊 | **Analytics & Charts** | Visualize strength gains, volume, and trends over time |
+| 📅 | **Calendar History** | See every session at a glance with a calendar view |
+| ☁️ | **Google Drive Backup** | Sync your data across devices via Google Drive |
+| 🎵 | **Spotify Integration** | Control your music without leaving the app |
+| 🔔 | **Smart Notifications** | Rest timer alerts so you never miss a set |
+| 🔄 | **OTA Updates** | Get the latest features instantly — no reinstall needed |
+| 🌙 | **Themes** | Multiple color themes with dark mode support |
+| 📦 | **Fully Offline** | All data stored locally in SQLite — works without internet |
+
+---
+
+## 📲 Download
+
+Grab the latest APK from the [**Releases**](https://github.com/ayushneekhar/Apex/releases/latest) page.
+
+> **Note:** iOS builds are currently available for development only. A TestFlight release is planned.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React Native 0.81 + Expo 54 |
+| Language | TypeScript |
+| State | Zustand |
+| Database | SQLite (expo-sqlite) |
+| Navigation | React Navigation |
+| Charts | react-native-gifted-charts |
+| OTA Updates | react-native-nitro-ota |
+| Auth | expo-auth-session (Spotify, Google) |
+| Haptics | react-native-nitro-haptics |
+
+---
+
+## 🏗️ Building from Source
 
 ```bash
+# Clone the repo
+git clone https://github.com/ayushneekhar/Apex.git
+cd Apex
+
+# Install dependencies
 yarn install
-```
 
-2. Start Metro
-
-```bash
+# Start Metro bundler
 yarn start
-```
 
-3. Run on device/simulator
-
-```bash
-yarn ios
+# Run on device/simulator
 yarn android
+yarn ios
 ```
 
-## Native + Expo Modules sync
-
-When you change Expo config plugins in `app.json`, regenerate native changes with:
+### Building an APK locally
 
 ```bash
-yarn prebuild
+# Debug build
+yarn android:apk:debug
+
+# Release build
+yarn android:apk:release
 ```
 
+---
 
-## GitHub Actions environment variables (development vs production)
+## 🔄 CI/CD
 
-This repo uses **GitHub Environments** so CI builds can choose between development and production settings at runtime.
+Every push to `main` is triaged automatically by a single CI router:
 
-### 1) Create two GitHub Environments
+| Change type | What happens |
+|---|---|
+| Native files (`android/`, `ios/`, `package.json`, …) | 🏗️ APK build → GitHub Release with tag + notes |
+| JS/TS-only files | 📡 Over-the-air update via Nitro OTA |
+| Commit contains `[build]` | 🏗️ Forces native build regardless |
 
-In GitHub:
+No manual steps needed — merge to `main` and the right thing happens.
 
-- Go to **Settings → Environments**
-- Create:
-  - `development`
-  - `production`
+---
 
-### 2) Add environment values
+## 📄 License
 
-Set these in each environment:
+This project is for personal use. All rights reserved.
 
-#### Secret (Environment secret)
+---
 
-- `EXPO_PUBLIC_SPOTIFY_CLIENT_ID`
-- `EXPO_PUBLIC_GOOGLE_DRIVE_ANDROID_CLIENT_ID`
-- `EXPO_PUBLIC_GOOGLE_DRIVE_IOS_CLIENT_ID`
-
-> Set this under **Environment → Secrets and variables → Actions → Secrets**.
-
-#### Variables (Environment variables)
-
-- `EXPO_PUBLIC_NITRO_OTA_GITHUB_URL`
-- `EXPO_PUBLIC_NITRO_OTA_VERSION_PATH`
-- `EXPO_PUBLIC_NITRO_OTA_ANDROID_REF`
-- `EXPO_PUBLIC_NITRO_OTA_IOS_REF`
-
-> Set these under **Environment → Secrets and variables → Actions → Variables**.
-
-Recommended values:
-
-- `development`
-  - `EXPO_PUBLIC_NITRO_OTA_ANDROID_REF=nitro-ota-android-development`
-  - `EXPO_PUBLIC_NITRO_OTA_IOS_REF=nitro-ota-ios-development`
-- `production`
-  - `EXPO_PUBLIC_NITRO_OTA_ANDROID_REF=nitro-ota-android-production`
-  - `EXPO_PUBLIC_NITRO_OTA_IOS_REF=nitro-ota-ios-production`
-
-### 3) Choose build mode when running workflows
-
-#### Android APK Release
-
-Workflow now prompts for:
-
-- `build_environment` (`development` or `production`)
-- `build_type` (`development` or `production`)
-
-Behavior:
-
-- `build_type=development` builds debug APK (`assembleDebug`)
-- `build_type=production` builds release APK (`assembleRelease`)
-- `build_environment` selects which environment secrets/variables are injected
-
-#### Publish Nitro OTA
-
-Workflow now prompts for:
-
-- `deployment_environment` (`development` or `production`)
-- existing OTA inputs (`platform`, `ota_version`, etc.)
-
-Behavior:
-
-- If `ota_branch` is empty, it defaults to:
-  - `nitro-ota-<platform>-development` for development
-  - `nitro-ota-<platform>-production` for production
-- `deployment_environment` selects which environment secrets/variables are injected
-
-### 4) Why this fixes OAuth envs in CI
-
-Spotify and Google Drive auth check `process.env.EXPO_PUBLIC_*` values at bundle-build time. By storing these as environment secrets and selecting the matching GitHub Environment in workflow dispatch, CI and Nitro OTA builds get the correct values for that build.
+<p align="center">
+  Built with ❤️ by <a href="https://github.com/ayushneekhar">ayushneekhar</a>
+</p>

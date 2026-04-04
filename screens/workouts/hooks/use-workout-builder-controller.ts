@@ -23,14 +23,17 @@ import {
 
 type BuilderDeps = {
   weightUnit: WeightUnit;
+  workoutCount: number;
   clearStoreError: () => void;
   addWorkout: (input: {
     name: string;
+    templateOrder: number;
     exercises: NewWorkoutExerciseInput[];
   }) => Promise<void>;
   editWorkout: (input: {
     id: string;
     name: string;
+    templateOrder: number;
     exercises: NewWorkoutExerciseInput[];
   }) => Promise<void>;
 };
@@ -57,12 +60,14 @@ function sanitizeSupersetDrafts(drafts: ExerciseDraft[]): ExerciseDraft[] {
 
 export function useWorkoutBuilderController({
   weightUnit,
+  workoutCount,
   clearStoreError,
   addWorkout,
   editWorkout,
 }: BuilderDeps) {
   const [isComposerOpen, setIsComposerOpen] = useState(false);
   const [workoutName, setWorkoutName] = useState("");
+  const [workoutOrder, setWorkoutOrder] = useState(String(workoutCount + 1));
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [customExerciseName, setCustomExerciseName] = useState("");
   const [exerciseDrafts, setExerciseDrafts] = useState<ExerciseDraft[]>([]);
@@ -82,6 +87,7 @@ export function useWorkoutBuilderController({
   function openComposer() {
     setIsComposerOpen(true);
     setWorkoutName("");
+    setWorkoutOrder(String(workoutCount + 1));
     setEditingWorkoutId(null);
     setCustomExerciseName("");
     setExerciseDrafts([]);
@@ -91,6 +97,7 @@ export function useWorkoutBuilderController({
 
   function openComposerForEdit(workout: Workout) {
     setWorkoutName(workout.name);
+    setWorkoutOrder(String(workout.templateOrder));
     setEditingWorkoutId(workout.id);
     setExerciseDrafts(
       [...workout.exercises]
@@ -123,6 +130,7 @@ export function useWorkoutBuilderController({
   function closeComposer() {
     setIsComposerOpen(false);
     setWorkoutName("");
+    setWorkoutOrder(String(workoutCount + 1));
     setEditingWorkoutId(null);
     setCustomExerciseName("");
     setExerciseDrafts([]);
@@ -243,6 +251,13 @@ export function useWorkoutBuilderController({
       return false;
     }
 
+    const parsedOrder = Number.parseInt(workoutOrder.trim(), 10);
+
+    if (!Number.isFinite(parsedOrder) || parsedOrder < 1) {
+      setFormError("Workout order must be 1 or greater.");
+      return false;
+    }
+
     if (exerciseDrafts.length === 0) {
       setFormError("Add at least one exercise.");
       return false;
@@ -312,11 +327,13 @@ export function useWorkoutBuilderController({
         await editWorkout({
           id: editingWorkoutId,
           name: trimmedWorkoutName,
+          templateOrder: parsedOrder,
           exercises: parsedExercises,
         });
       } else {
         await addWorkout({
           name: trimmedWorkoutName,
+          templateOrder: parsedOrder,
           exercises: parsedExercises,
         });
       }
@@ -336,6 +353,7 @@ export function useWorkoutBuilderController({
   return {
     isComposerOpen,
     workoutName,
+    workoutOrder,
     editingWorkoutId,
     customExerciseName,
     exerciseDrafts,
@@ -347,6 +365,7 @@ export function useWorkoutBuilderController({
     openComposerForEdit,
     closeComposer,
     setWorkoutName,
+    setWorkoutOrder,
     setCustomExerciseName,
     addExerciseToDraft,
     addCustomExercise,

@@ -23,8 +23,9 @@ type Props = {
 };
 
 export function SavedWorkoutCard({ controller, workout }: Props) {
-  const { theme, activeSession, lastCompletedWorkout } = controller;
+  const { theme, activeSession, lastCompletedWorkout, nextScheduledWorkout } = controller;
   const isPreviousWorkout = lastCompletedWorkout?.workoutId === workout.id;
+  const isNextWorkout = nextScheduledWorkout?.id === workout.id;
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [isApplyingOverload, setIsApplyingOverload] = useState(false);
@@ -88,25 +89,53 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
           <View style={styles.headerText}>
             <View style={styles.headerTitleRow}>
               <AppText variant="heading">{workout.name}</AppText>
-              {isPreviousWorkout ? (
-                <View
-                  style={[
-                    styles.previousBadge,
-                    {
-                      borderColor: `${theme.palette.accentSecondary}66`,
-                      backgroundColor: `${theme.palette.accentSecondary}18`,
-                    },
-                  ]}
-                >
-                  <Ionicons name="arrow-back-circle" size={12} color={theme.palette.accentSecondary} />
-                  <AppText variant="micro" style={{ color: theme.palette.accentSecondary }}>
-                    Previous
-                  </AppText>
-                </View>
-              ) : null}
+              <View style={styles.templateMarkerRow}>
+                {isPreviousWorkout ? (
+                  <View
+                    style={[
+                      styles.templateMarker,
+                      {
+                        borderColor: `${theme.palette.accentSecondary}4d`,
+                        backgroundColor: `${theme.palette.accentSecondary}14`,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.templateMarkerDot,
+                        { backgroundColor: theme.palette.accentSecondary },
+                      ]}
+                    />
+                    <AppText variant="micro" style={{ color: theme.palette.accentSecondary }}>
+                      Last
+                    </AppText>
+                  </View>
+                ) : null}
+                {isNextWorkout ? (
+                  <View
+                    style={[
+                      styles.templateMarker,
+                      {
+                        borderColor: `${theme.palette.accent}4d`,
+                        backgroundColor: `${theme.palette.accent}14`,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.templateMarkerDot,
+                        { backgroundColor: theme.palette.accent },
+                      ]}
+                    />
+                    <AppText variant="micro" style={{ color: theme.palette.accent }}>
+                      Next up
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
             </View>
             <AppText variant="micro" tone="muted">
-              Week {workout.weeksCompleted + 1} target
+              Order {workout.templateOrder} • Week {workout.weeksCompleted + 1} target
             </AppText>
           </View>
 

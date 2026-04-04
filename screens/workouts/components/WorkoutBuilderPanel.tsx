@@ -44,6 +44,18 @@ export function WorkoutBuilderPanel({
         }}
       />
 
+      <NeonInput
+        label="Workout Order"
+        placeholder="1"
+        keyboardType="number-pad"
+        helperText="Lower numbers come first when picking the next workout."
+        value={controller.workoutOrder}
+        onChangeText={(value) => {
+          controller.clearFormError();
+          controller.setWorkoutOrder(value);
+        }}
+      />
+
       <AppText variant="label" tone="muted">
         Pick Exercises
       </AppText>

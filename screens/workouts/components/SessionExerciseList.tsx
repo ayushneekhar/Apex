@@ -73,37 +73,62 @@ export function SessionExerciseList({
                   ) : null}
                 </View>
 
-                {groupCompleted ? (
-                  <View
-                    style={[
-                      styles.statusBadge,
+                <View style={styles.exerciseHeaderActions}>
+                  <Pressable
+                    onPress={() => {
+                      controller.openExerciseEditor(group.workoutExerciseId);
+                    }}
+                    style={({ pressed }) => [
+                      styles.exerciseEditButton,
                       {
-                        borderColor: `${theme.palette.success}66`,
-                        backgroundColor: `${theme.palette.success}1a`,
+                        borderColor: theme.palette.border,
+                        backgroundColor: theme.palette.panelSoft,
+                        opacity: pressed ? opacity.pressedSoft : 1,
                       },
                     ]}
                   >
-                    <Ionicons name="checkmark-circle" size={14} color={theme.palette.success} />
-                    <AppText variant="micro" tone="success">
-                      Completed
+                    <Ionicons
+                      name="create-outline"
+                      size={13}
+                      color={theme.palette.textMuted}
+                    />
+                    <AppText variant="micro" tone="muted">
+                      Edit
                     </AppText>
-                  </View>
-                ) : isCurrentGroup ? (
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      {
-                        borderColor: `${theme.palette.accent}66`,
-                        backgroundColor: `${theme.palette.accent}18`,
-                      },
-                    ]}
-                  >
-                    <Ionicons name="play" size={12} color={theme.palette.accent} />
-                    <AppText variant="micro" tone="accent">
-                      Current
-                    </AppText>
-                  </View>
-                ) : null}
+                  </Pressable>
+
+                  {groupCompleted ? (
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          borderColor: `${theme.palette.success}66`,
+                          backgroundColor: `${theme.palette.success}1a`,
+                        },
+                      ]}
+                    >
+                      <Ionicons name="checkmark-circle" size={14} color={theme.palette.success} />
+                      <AppText variant="micro" tone="success">
+                        Completed
+                      </AppText>
+                    </View>
+                  ) : isCurrentGroup ? (
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          borderColor: `${theme.palette.accent}66`,
+                          backgroundColor: `${theme.palette.accent}18`,
+                        },
+                      ]}
+                    >
+                      <Ionicons name="play" size={12} color={theme.palette.accent} />
+                      <AppText variant="micro" tone="accent">
+                        Current
+                      </AppText>
+                    </View>
+                  ) : null}
+                </View>
               </View>
               <AppText variant="micro" tone="muted">
                 Target {formatWeightFromKg(Math.abs(group.targetWeightKg), settings.weightUnit)}

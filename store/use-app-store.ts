@@ -74,6 +74,11 @@ type AppStoreState = {
     weightKg: number,
     weightScope?: "current" | "remaining" | "all"
   ) => Promise<void>;
+  updateActiveSessionExerciseTargets: (
+    workoutExerciseId: string,
+    sets: number,
+    reps: number
+  ) => Promise<void>;
   finishActiveWorkoutSession: () => Promise<void>;
   discardActiveWorkoutSession: () => Promise<void>;
 };
@@ -137,6 +142,29 @@ function getFirstPendingExerciseId(session: ActiveWorkoutSession): string | null
   }
 
   return null;
+}
+
+function getPreferredCurrentExerciseId(
+  session: ActiveWorkoutSession,
+  preferredExerciseId: string | null,
+  fallbackExerciseId: string | null
+): string | null {
+  const hasPendingSets = (workoutExerciseId: string | null) =>
+    workoutExerciseId !== null &&
+    session.sets.some(
+      (setEntry) =>
+        setEntry.workoutExerciseId === workoutExerciseId && setEntry.actualReps === 0
+    );
+
+  if (hasPendingSets(preferredExerciseId)) {
+    return preferredExerciseId;
+  }
+
+  if (hasPendingSets(fallbackExerciseId)) {
+    return fallbackExerciseId;
+  }
+
+  return getFirstPendingExerciseId(session);
 }
 
 function getNextCurrentExerciseIdAfterCompletion(
@@ -792,6 +820,83 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
+  },
+  updateActiveSessionExerciseTargets: async (workoutExerciseId, sets, reps) => {
+    const session = get().activeSession;
+    if (!session) {
+      return;
+    }
+
+    const normalizedSets = Math.max(1, Math.floor(sets));
+    const normalizedReps = Math.max(1, Math.floor(reps));
+    const selectedSets = session.sets
+      .filter((setEntry) => setEntry.workoutExerciseId === workoutExerciseId)
+      .sort((a, b) => a.setNumber - b.setNumber);
+
+    if (selectedSets.length === 0) {
+      return;
+    }
+
+    const completedSetCount = selectedSets.filter((setEntry) => setEntry.actualReps > 0).length;
+
+    if (normalizedSets < completedSetCount) {
+      throw new Error(
+        `Sets cannot be lower than ${completedSetCount} because completed sets would be lost.`
+      );
+    }
+
+    let changed = selectedSets.length !== normalizedSets;
+    const templateSet = selectedSets[selectedSets.length - 1] ?? selectedSets[0];
+    const nextExerciseSets = Array.from({ length: normalizedSets }, (_, index) => {
+      const existingSet = selectedSets[index];
+
+      if (!existingSet) {
+        changed = true;
+
+        return {
+          ...templateSet,
+          id: createId('active_set'),
+          setNumber: index + 1,
+          targetReps: normalizedReps,
+          actualWeightKg: templateSet.actualWeightKg,
+          actualReps: 0,
+          completedAt: null,
+        };
+      }
+
+      if (existingSet.setNumber !== index + 1 || existingSet.targetReps !== normalizedReps) {
+        changed = true;
+      }
+
+      return {
+        ...existingSet,
+        setNumber: index + 1,
+        targetReps: normalizedReps,
+      };
+    });
+
+    if (!changed) {
+      return;
+    }
+
+    const nextSession = {
+      ...session,
+      sets: [
+        ...session.sets.filter((setEntry) => setEntry.workoutExerciseId !== workoutExerciseId),
+        ...nextExerciseSets,
+      ],
+    };
+    const nextSessionWithCurrentExercise = {
+      ...nextSession,
+      currentExerciseId: getPreferredCurrentExerciseId(
+        nextSession,
+        workoutExerciseId,
+        session.currentExerciseId
+      ),
+    };
+
+    await saveActiveWorkoutSession(nextSessionWithCurrentExercise);
+    set({ activeSession: nextSessionWithCurrentExercise, error: null });
   },
   finishActiveWorkoutSession: async () => {
     const session = get().activeSession;

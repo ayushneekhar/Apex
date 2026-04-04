@@ -10,6 +10,7 @@ import { designTokens } from '@/constants/design-system';
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
 import { DiscardSessionModal } from './DiscardSessionModal';
 import { EditCustomSetModal } from './EditCustomSetModal';
+import { EditExerciseModal } from './EditExerciseModal';
 import { ErrorNotice } from './common/ErrorNotice';
 import { SessionExerciseList } from './SessionExerciseList';
 import { SessionFooterActions } from './SessionFooterActions';
@@ -88,7 +89,7 @@ export function ActiveSessionOverlay({
           >
             <AppText variant="heading">{activeSession.workoutName}</AppText>
             <AppText tone="muted">
-              Tap top of a set to mark complete or decrement reps. Press and hold the set to edit reps. Tap bottom strip to edit weight.
+              Tap top of a set to mark complete or decrement reps. Press and hold the set to edit reps. Tap bottom strip to edit weight. Use Edit on an exercise to change sets and targets.
             </AppText>
           </Animated.View>
         </Animated.View>
@@ -104,6 +105,7 @@ export function ActiveSessionOverlay({
       </ScrollView>
 
       <EditCustomSetModal controller={controller} />
+      <EditExerciseModal controller={controller} />
       <DiscardSessionModal controller={controller} />
     </Animated.View>
   );

@@ -27,14 +27,25 @@ export const styles = StyleSheet.create({
     gap: spacing.sm,
     flexWrap: 'wrap',
   },
-  previousBadge: {
+  templateMarkerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  templateMarker: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xxxs,
     borderWidth: border.thin,
     borderRadius: radii.pill,
     paddingVertical: spacing.xxxs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
+  },
+  templateMarkerDot: {
+    width: 5,
+    height: 5,
+    borderRadius: radii.pill,
   },
   headerActions: {
     flexDirection: 'row',

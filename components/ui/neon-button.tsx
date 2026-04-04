@@ -38,6 +38,9 @@ export function NeonButton({ title, variant = 'primary', disabled, style, ...res
 
   return (
     <Pressable
+      accessible={rest.accessible ?? true}
+      accessibilityRole={rest.accessibilityRole ?? 'button'}
+      accessibilityLabel={rest.accessibilityLabel ?? title}
       disabled={disabled}
       style={({ pressed }) => [
         styles.base,

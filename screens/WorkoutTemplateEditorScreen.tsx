@@ -52,6 +52,7 @@ export default function WorkoutTemplateEditorScreen() {
 
   const builder = useWorkoutBuilderController({
     weightUnit: settings.weightUnit,
+    workoutCount: workouts.length,
     clearStoreError: clearError,
     addWorkout,
     editWorkout,

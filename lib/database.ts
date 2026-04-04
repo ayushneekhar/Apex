@@ -35,6 +35,7 @@ type SettingRow = {
 type WorkoutRow = {
   id: string;
   name: string;
+  template_order: number;
   created_at: number;
   weeks_completed: number;
 };
@@ -97,6 +98,53 @@ function isUserCancellationError(error: unknown): boolean {
   return /cancel/i.test(error.message);
 }
 
+async function normalizeWorkoutTemplateOrders(db: SQLiteDatabase): Promise<void> {
+  const rows = await db.getAllAsync<{
+    id: string;
+    template_order: number | null;
+    created_at: number;
+  }>(
+    `
+      SELECT id, template_order, created_at
+      FROM workouts
+      ORDER BY
+        CASE
+          WHEN template_order IS NULL OR template_order < 1 THEN 1
+          ELSE 0
+        END ASC,
+        template_order ASC,
+        created_at ASC;
+    `
+  );
+
+  const seenOrders = new Set<number>();
+  const needsNormalization = rows.some((row, index) => {
+    const normalizedOrder =
+      typeof row.template_order === 'number' && Number.isFinite(row.template_order)
+        ? Math.floor(row.template_order)
+        : 0;
+
+    if (normalizedOrder !== index + 1 || normalizedOrder < 1 || seenOrders.has(normalizedOrder)) {
+      return true;
+    }
+
+    seenOrders.add(normalizedOrder);
+    return false;
+  });
+
+  if (!needsNormalization) {
+    return;
+  }
+
+  for (const [index, row] of rows.entries()) {
+    await db.runAsync(
+      'UPDATE workouts SET template_order = ? WHERE id = ?;',
+      index + 1,
+      row.id
+    );
+  }
+}
+
 export async function initializeDatabase(): Promise<void> {
   const db = await getDatabase();
 
@@ -111,6 +159,7 @@ export async function initializeDatabase(): Promise<void> {
     CREATE TABLE IF NOT EXISTS workouts (
       id TEXT PRIMARY KEY NOT NULL,
       name TEXT NOT NULL,
+      template_order INTEGER NOT NULL DEFAULT 1,
       created_at INTEGER NOT NULL,
       weeks_completed INTEGER NOT NULL DEFAULT 0
     );
@@ -197,6 +246,15 @@ export async function initializeDatabase(): Promise<void> {
       'ALTER TABLE workout_exercises ADD COLUMN superset_with_exercise_id TEXT;'
     );
   }
+
+  const workoutTableColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(workouts);');
+  const hasTemplateOrderColumn = workoutTableColumns.some((column) => column.name === 'template_order');
+
+  if (!hasTemplateOrderColumn) {
+    await db.execAsync('ALTER TABLE workouts ADD COLUMN template_order INTEGER NOT NULL DEFAULT 1;');
+  }
+
+  await normalizeWorkoutTemplateOrders(db);
 }
 
 function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | null {
@@ -380,7 +438,11 @@ export async function listWorkouts(): Promise<Workout[]> {
 
   const [workoutRows, exerciseRows, sessionRows, sessionSetRows] = await Promise.all([
     db.getAllAsync<WorkoutRow>(
-      'SELECT id, name, created_at, weeks_completed FROM workouts ORDER BY created_at DESC;'
+      `
+        SELECT id, name, template_order, created_at, weeks_completed
+        FROM workouts
+        ORDER BY template_order ASC, created_at DESC;
+      `
     ),
     db.getAllAsync<WorkoutExerciseRow>(
       `
@@ -502,6 +564,7 @@ export async function listWorkouts(): Promise<Workout[]> {
   return workoutRows.map((row) => ({
     id: row.id,
     name: row.name,
+    templateOrder: row.template_order,
     createdAt: row.created_at,
     weeksCompleted: row.weeks_completed,
     exercises: exerciseMap.get(row.id) ?? [],
@@ -526,13 +589,30 @@ export async function createWorkout(input: NewWorkoutInput): Promise<void> {
   });
 
   await db.withTransactionAsync(async () => {
+    const { count } = (await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM workouts;'
+    )) ?? { count: 0 };
+    const requestedOrder = Number.isFinite(input.templateOrder)
+      ? Math.floor(input.templateOrder)
+      : count + 1;
+    const desiredOrder = Math.min(
+      Math.max(1, requestedOrder),
+      count + 1
+    );
+
+    await db.runAsync(
+      'UPDATE workouts SET template_order = template_order + 1 WHERE template_order >= ?;',
+      desiredOrder
+    );
+
     await db.runAsync(
       `
-        INSERT INTO workouts (id, name, created_at, weeks_completed)
-        VALUES (?, ?, ?, ?);
+        INSERT INTO workouts (id, name, template_order, created_at, weeks_completed)
+        VALUES (?, ?, ?, ?, ?);
       `,
       workoutId,
       input.name.trim(),
+      desiredOrder,
       createdAt,
       0
     );
@@ -627,13 +707,59 @@ export async function updateWorkout(input: UpdateWorkoutInput): Promise<void> {
   });
 
   await db.withTransactionAsync(async () => {
+    const existingWorkout = await db.getFirstAsync<{ template_order: number }>(
+      'SELECT template_order FROM workouts WHERE id = ?;',
+      input.id
+    );
+
+    if (!existingWorkout) {
+      throw new Error('Workout not found.');
+    }
+
+    const { count } = (await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM workouts;'
+    )) ?? { count: 0 };
+    const currentOrder = Math.max(1, Math.floor(existingWorkout.template_order));
+    const requestedOrder = Number.isFinite(input.templateOrder)
+      ? Math.floor(input.templateOrder)
+      : currentOrder;
+    const desiredOrder = Math.min(
+      Math.max(1, requestedOrder),
+      Math.max(1, count)
+    );
+
+    if (desiredOrder < currentOrder) {
+      await db.runAsync(
+        `
+          UPDATE workouts
+          SET template_order = template_order + 1
+          WHERE id != ? AND template_order >= ? AND template_order < ?;
+        `,
+        input.id,
+        desiredOrder,
+        currentOrder
+      );
+    } else if (desiredOrder > currentOrder) {
+      await db.runAsync(
+        `
+          UPDATE workouts
+          SET template_order = template_order - 1
+          WHERE id != ? AND template_order <= ? AND template_order > ?;
+        `,
+        input.id,
+        desiredOrder,
+        currentOrder
+      );
+    }
+
     await db.runAsync(
       `
         UPDATE workouts
-        SET name = ?
+        SET name = ?, template_order = ?
         WHERE id = ?;
       `,
       input.name.trim(),
+      desiredOrder,
       input.id
     );
 
@@ -732,7 +858,10 @@ export async function advanceWorkoutWeek(workoutId: string): Promise<void> {
 export async function deleteWorkout(workoutId: string): Promise<void> {
   const db = await getDatabase();
 
-  await db.runAsync('DELETE FROM workouts WHERE id = ?;', workoutId);
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM workouts WHERE id = ?;', workoutId);
+    await normalizeWorkoutTemplateOrders(db);
+  });
 }
 
 export async function exportDatabaseBackup(): Promise<string | null> {

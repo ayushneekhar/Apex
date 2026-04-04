@@ -46,6 +46,7 @@ export type WorkoutBuilderViewController = {
   mutating: boolean;
   editingWorkoutId: string | null;
   workoutName: string;
+  workoutOrder: string;
   customExerciseName: string;
   exerciseDrafts: ExerciseDraft[];
   formError: string | null;
@@ -53,6 +54,7 @@ export type WorkoutBuilderViewController = {
   defaultOverload: string;
   clearFormError: () => void;
   setWorkoutName: (value: string) => void;
+  setWorkoutOrder: (value: string) => void;
   setCustomExerciseName: (value: string) => void;
   addExerciseToDraft: (name: string) => void;
   addCustomExercise: () => void;

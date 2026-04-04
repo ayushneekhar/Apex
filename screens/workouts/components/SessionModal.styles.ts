@@ -17,12 +17,22 @@ export const styles = StyleSheet.create({
     padding: spacing.xl,
     gap: spacing.lg,
   },
+  fieldRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+  },
+  fieldCell: {
+    flex: 1,
+  },
   actions: {
     flexDirection: "row",
     gap: spacing.sm,
   },
   actionCell: {
     flex: 1,
+  },
+  actionStack: {
+    gap: spacing.sm,
   },
   scopeTabs: {
     flexDirection: "row",

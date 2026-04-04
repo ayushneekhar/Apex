@@ -34,6 +34,7 @@ export type WorkoutSession = {
 export type Workout = {
   id: string;
   name: string;
+  templateOrder: number;
   createdAt: number;
   weeksCompleted: number;
   exercises: WorkoutExercise[];
@@ -52,12 +53,14 @@ export type NewWorkoutExerciseInput = {
 
 export type NewWorkoutInput = {
   name: string;
+  templateOrder: number;
   exercises: NewWorkoutExerciseInput[];
 };
 
 export type UpdateWorkoutInput = {
   id: string;
   name: string;
+  templateOrder: number;
   exercises: NewWorkoutExerciseInput[];
 };
 

@@ -20,11 +20,25 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
+  exerciseHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
   exerciseNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     flexShrink: 1,
+  },
+  exerciseEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxxs,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xxxs,
   },
   statusBadge: {
     flexDirection: 'row',

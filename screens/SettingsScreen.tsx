@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/ui/app-text";
@@ -15,12 +15,6 @@ import {
   getNitroOtaStartupRecoveryStatus,
   type NitroOtaStartupRecoveryStatus,
 } from "@/lib/nitro-ota";
-import {
-  connectSpotify,
-  disconnectSpotify,
-  isSpotifyConfigured,
-  isSpotifyConnected,
-} from "@/lib/spotify";
 import { formatWeightFromKg, getDefaultWeeklyIncrementKg } from "@/lib/weight";
 import { useAppStore } from "@/store/use-app-store";
 import BackupCenterScreen from "./BackupCenterScreen";
@@ -38,10 +32,6 @@ export default function SettingsScreen() {
     (state) => state.setNitroOtaUpdateCheck
   );
   const [showBackupCenter, setShowBackupCenter] = useState(false);
-  const [spotifyConnected, setSpotifyConnected] = useState(false);
-  const [spotifyBusy, setSpotifyBusy] = useState(false);
-  const [spotifyError, setSpotifyError] = useState<string | null>(null);
-  const [spotifyStatus, setSpotifyStatus] = useState<string | null>(null);
   const [updateBusy, setUpdateBusy] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
   const [nitroOtaSnapshot, setNitroOtaSnapshot] = useState(() =>
@@ -50,47 +40,11 @@ export default function SettingsScreen() {
   const [nitroOtaStartupRecovery, setNitroOtaStartupRecovery] =
     useState<NitroOtaStartupRecoveryStatus | null>(null);
 
-  const spotifyConfigured = isSpotifyConfigured();
-
   const sampleWeight = formatWeightFromKg(100, settings.weightUnit);
   const defaultIncrement = formatWeightFromKg(
     getDefaultWeeklyIncrementKg(settings.weightUnit),
     settings.weightUnit
   );
-
-  const refreshSpotifyStatus = useCallback(async () => {
-    if (!spotifyConfigured) {
-      setSpotifyConnected(false);
-      setSpotifyError(null);
-      setSpotifyStatus(
-        "Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID. Add it to enable Spotify login."
-      );
-      return;
-    }
-
-    setSpotifyBusy(true);
-    setSpotifyError(null);
-
-    try {
-      const connected = await isSpotifyConnected();
-      setSpotifyConnected(connected);
-      setSpotifyStatus(connected ? "" : "Not connected.");
-    } catch (error) {
-      setSpotifyConnected(false);
-      setSpotifyStatus(null);
-      setSpotifyError(
-        error instanceof Error
-          ? error.message
-          : "Could not check Spotify connection."
-      );
-    } finally {
-      setSpotifyBusy(false);
-    }
-  }, [spotifyConfigured]);
-
-  useEffect(() => {
-    void refreshSpotifyStatus();
-  }, [refreshSpotifyStatus]);
 
   useEffect(() => {
     let mounted = true;
@@ -147,56 +101,6 @@ export default function SettingsScreen() {
       setUpdateBusy(false);
     }
   }, [setNitroOtaUpdateCheck]);
-
-  const handleConnectSpotify = async () => {
-    if (!spotifyConfigured) {
-      Alert.alert(
-        "Spotify client ID missing",
-        "Set EXPO_PUBLIC_SPOTIFY_CLIENT_ID and restart the app before connecting Spotify."
-      );
-      return;
-    }
-
-    setSpotifyBusy(true);
-    setSpotifyError(null);
-
-    try {
-      const connected = await connectSpotify();
-
-      if (!connected) {
-        setSpotifyStatus("Spotify connection cancelled.");
-        return;
-      }
-
-      setSpotifyConnected(true);
-      setSpotifyStatus("Spotify connected successfully.");
-    } catch (error) {
-      setSpotifyConnected(false);
-      setSpotifyStatus(null);
-      setSpotifyError(
-        error instanceof Error ? error.message : "Could not connect Spotify."
-      );
-    } finally {
-      setSpotifyBusy(false);
-    }
-  };
-
-  const handleDisconnectSpotify = async () => {
-    setSpotifyBusy(true);
-    setSpotifyError(null);
-
-    try {
-      await disconnectSpotify();
-      setSpotifyConnected(false);
-      setSpotifyStatus("Spotify disconnected.");
-    } catch (error) {
-      setSpotifyError(
-        error instanceof Error ? error.message : "Could not disconnect Spotify."
-      );
-    } finally {
-      setSpotifyBusy(false);
-    }
-  };
 
   if (showBackupCenter) {
     return (
@@ -392,60 +296,6 @@ export default function SettingsScreen() {
               <AppText tone="accent">{defaultIncrement}</AppText>
             </View>
           </View>
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              borderColor: theme.palette.border,
-              backgroundColor: theme.palette.panel,
-            },
-          ]}
-        >
-          <AppText variant="heading">Spotify</AppText>
-          <AppText tone="muted">
-            Connect Spotify to show your current song while an active workout
-            session is running.
-          </AppText>
-
-          <View style={styles.backupActions}>
-            {spotifyConnected ? (
-              <NeonButton
-                title={spotifyBusy ? "Working..." : "Disconnect Spotify"}
-                variant="ghost"
-                onPress={() => {
-                  void handleDisconnectSpotify();
-                }}
-                disabled={spotifyBusy}
-              />
-            ) : (
-              <NeonButton
-                title={spotifyBusy ? "Working..." : "Connect Spotify"}
-                onPress={() => {
-                  void handleConnectSpotify();
-                }}
-                disabled={spotifyBusy}
-              />
-            )}
-          </View>
-
-          {spotifyError ? (
-            <AppText tone="danger">{spotifyError}</AppText>
-          ) : null}
-          {!spotifyError && spotifyStatus ? (
-            <AppText
-              tone={
-                spotifyConnected
-                  ? "success"
-                  : spotifyConfigured
-                  ? "muted"
-                  : "danger"
-              }
-            >
-              {spotifyStatus}
-            </AppText>
-          ) : null}
         </View>
 
         <View

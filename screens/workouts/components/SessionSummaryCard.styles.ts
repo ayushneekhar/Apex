@@ -25,62 +25,6 @@ export const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  spotifyCard: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  spotifyCardStack: {
-    position: "relative",
-    minHeight: sizes.iconLarge * 2,
-    justifyContent: "center",
-  },
-  spotifyCardPreviewLayer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    bottom: 0,
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  spotifyCardPreviewContent: {
-    flex: 1,
-    justifyContent: "center",
-  },
-  spotifyCardContentLayer: {
-    position: "relative",
-  },
-  spotifyArtworkWrap: {
-    overflow: "hidden",
-  },
-  spotifyTrackRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  spotifyArtwork: {
-    width: sizes.iconLarge * 2,
-    height: sizes.iconLarge * 2,
-    borderRadius: radii.md,
-  },
-  spotifyArtworkFallback: {
-    width: sizes.iconLarge * 2,
-    height: sizes.iconLarge * 2,
-    borderWidth: border.thin,
-    borderRadius: radii.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  spotifyTrackText: {
-    flex: 1,
-    gap: spacing.xxxs,
-  },
-  spotifyPreviewMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-  },
   restTimerCard: {
     borderWidth: border.thin,
     borderRadius: radii.xl,

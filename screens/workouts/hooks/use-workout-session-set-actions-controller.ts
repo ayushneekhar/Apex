@@ -10,7 +10,12 @@ import {
   parseWeightInputToKg,
   type WeightUnit,
 } from "@/lib/weight";
-import type { ActiveWorkoutSession, ActiveWorkoutSet } from "@/types/workout";
+import type {
+  ActiveWorkoutSession,
+  ActiveWorkoutSet,
+  NewWorkoutExerciseInput,
+  Workout,
+} from "@/types/workout";
 
 import type {
   ActiveRestTimer,
@@ -21,6 +26,7 @@ import { clampRestSeconds } from "../utils";
 
 type SessionSetActionsDeps = {
   activeSession: ActiveWorkoutSession | null;
+  workouts: Workout[];
   weightUnit: WeightUnit;
   now: number;
   setSessionActionError: (value: string | null) => void;
@@ -37,6 +43,17 @@ type SessionSetActionsDeps = {
     weightKg: number,
     weightScope?: CustomWeightApplyScope
   ) => Promise<void>;
+  updateActiveSessionExerciseTargets: (
+    workoutExerciseId: string,
+    sets: number,
+    reps: number
+  ) => Promise<void>;
+  editWorkout: (input: {
+    id: string;
+    name: string;
+    templateOrder: number;
+    exercises: NewWorkoutExerciseInput[];
+  }) => Promise<void>;
   finishActiveWorkoutSession: () => Promise<void>;
   discardActiveWorkoutSession: () => Promise<void>;
 };
@@ -138,12 +155,15 @@ function resolveCustomSetValues({
 
 export function useWorkoutSessionSetActionsController({
   activeSession,
+  workouts,
   weightUnit,
   now,
   setSessionActionError,
   closeSessionScreen,
   decrementOrCompleteSessionSet,
   setSessionSetCustomValues,
+  updateActiveSessionExerciseTargets,
+  editWorkout,
   finishActiveWorkoutSession,
   discardActiveWorkoutSession,
 }: SessionSetActionsDeps) {
@@ -162,6 +182,10 @@ export function useWorkoutSessionSetActionsController({
   const [customSetError, setCustomSetError] = useState<string | null>(null);
   const [customWeightApplyScope, setCustomWeightApplyScope] =
     useState<CustomWeightApplyScope>("current");
+  const [exerciseEditorExerciseId, setExerciseEditorExerciseId] = useState<string | null>(null);
+  const [exerciseEditorSetsInput, setExerciseEditorSetsInput] = useState("");
+  const [exerciseEditorRepsInput, setExerciseEditorRepsInput] = useState("");
+  const [exerciseEditorError, setExerciseEditorError] = useState<string | null>(null);
   const [isDiscardSessionModalOpen, setIsDiscardSessionModalOpen] =
     useState(false);
 
@@ -172,6 +196,22 @@ export function useWorkoutSessionSetActionsController({
       activeSession?.sets.find((setEntry) => setEntry.id === customSetId) ??
       null,
     [activeSession?.sets, customSetId]
+  );
+  const exerciseEditorSets = useMemo(
+    () =>
+      activeSession?.sets
+        .filter(
+          (setEntry) => setEntry.workoutExerciseId === exerciseEditorExerciseId
+        )
+        .sort((a, b) => a.setNumber - b.setNumber) ?? [],
+    [activeSession?.sets, exerciseEditorExerciseId]
+  );
+  const exerciseEditorWorkout = useMemo(
+    () =>
+      activeSession
+        ? workouts.find((workout) => workout.id === activeSession.workoutId) ?? null
+        : null,
+    [activeSession, workouts]
   );
 
   const restRemainingMs = useMemo(
@@ -191,6 +231,7 @@ export function useWorkoutSessionSetActionsController({
   useEffect(() => {
     if (!activeSession) {
       closeCustomSetModal();
+      closeExerciseEditor();
       setIsDiscardSessionModalOpen(false);
       setActiveRestTimer(null);
 
@@ -233,6 +274,28 @@ export function useWorkoutSessionSetActionsController({
     setCustomWeightApplyScope("current");
   }
 
+  function openExerciseEditor(workoutExerciseId: string) {
+    const selectedSets = activeSession?.sets
+      .filter((setEntry) => setEntry.workoutExerciseId === workoutExerciseId)
+      .sort((a, b) => a.setNumber - b.setNumber);
+
+    if (!selectedSets || selectedSets.length === 0) {
+      return;
+    }
+
+    setExerciseEditorExerciseId(workoutExerciseId);
+    setExerciseEditorSetsInput(String(selectedSets.length));
+    setExerciseEditorRepsInput(String(selectedSets[0]?.targetReps ?? 0));
+    setExerciseEditorError(null);
+  }
+
+  function closeExerciseEditor() {
+    setExerciseEditorExerciseId(null);
+    setExerciseEditorSetsInput("");
+    setExerciseEditorRepsInput("");
+    setExerciseEditorError(null);
+  }
+
   async function saveCustomSetValues() {
     if (!customSetId || !customSetEntry) {
       return;
@@ -262,6 +325,98 @@ export function useWorkoutSessionSetActionsController({
     } catch {
       setCustomSetError("Could not save set values. Try again.");
     }
+  }
+
+  async function saveExerciseEditorValues(scope: "session" | "template") {
+    if (!exerciseEditorExerciseId || exerciseEditorSets.length === 0) {
+      return;
+    }
+
+    const parsedSets = Number.parseInt(exerciseEditorSetsInput.trim(), 10);
+    const parsedReps = Number.parseInt(exerciseEditorRepsInput.trim(), 10);
+
+    if (!Number.isFinite(parsedSets) || parsedSets < 1) {
+      setExerciseEditorError("Sets must be 1 or greater.");
+      return;
+    }
+
+    if (!Number.isFinite(parsedReps) || parsedReps < 1) {
+      setExerciseEditorError("Reps must be 1 or greater.");
+      return;
+    }
+
+    const completedSetCount = exerciseEditorSets.filter(
+      (setEntry) => setEntry.actualReps > 0
+    ).length;
+
+    if (parsedSets < completedSetCount) {
+      setExerciseEditorError(
+        `Sets cannot be lower than ${completedSetCount} because completed sets would be lost.`
+      );
+      return;
+    }
+
+    try {
+      await updateActiveSessionExerciseTargets(
+        exerciseEditorExerciseId,
+        parsedSets,
+        parsedReps
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message) {
+        setExerciseEditorError(error.message);
+        return;
+      }
+
+      setExerciseEditorError("Could not save exercise changes. Try again.");
+      return;
+    }
+
+    if (scope === "template") {
+      try {
+        if (!exerciseEditorWorkout) {
+          throw new Error("Workout not found.");
+        }
+
+        const selectedExerciseName = exerciseEditorSets[0]?.exerciseName.trim().toLowerCase() ?? "";
+        const orderedExercises = exerciseEditorWorkout.exercises
+          .slice()
+          .sort((a, b) => a.sortOrder - b.sortOrder);
+
+        await editWorkout({
+          id: exerciseEditorWorkout.id,
+          name: exerciseEditorWorkout.name,
+          templateOrder: exerciseEditorWorkout.templateOrder,
+          exercises: orderedExercises.map((exercise, index, exercises) => {
+            const isSelectedExercise =
+              exercise.id === exerciseEditorExerciseId ||
+              exercise.name.trim().toLowerCase() === selectedExerciseName;
+
+            return {
+              name: exercise.name,
+              sets: isSelectedExercise ? parsedSets : exercise.sets,
+              reps: isSelectedExercise ? parsedReps : exercise.reps,
+              restSeconds: exercise.restSeconds,
+              startWeightKg: exercise.startWeightKg,
+              overloadIncrementKg: exercise.overloadIncrementKg,
+              supersetWithNext:
+                index < exercises.length - 1 &&
+                exercise.supersetExerciseId === exercises[index + 1]?.id,
+            };
+          }),
+        });
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error && error.message
+            ? error.message
+            : "Could not save the template.";
+
+        setExerciseEditorError(`Saved for this workout only. ${errorMessage}`);
+        return;
+      }
+    }
+
+    closeExerciseEditor();
   }
 
   async function clearRestTimer() {
@@ -366,6 +521,10 @@ export function useWorkoutSessionSetActionsController({
     setCustomSetError((current) => (current ? null : current));
   }
 
+  function clearExerciseEditorError() {
+    setExerciseEditorError((current) => (current ? null : current));
+  }
+
   return {
     activeRestTimer,
     restRemainingMs,
@@ -390,6 +549,18 @@ export function useWorkoutSessionSetActionsController({
     saveCustomSetValues,
     closeCustomSetModal,
     clearCustomSetError,
+
+    exerciseEditorExerciseId,
+    exerciseEditorSets,
+    exerciseEditorSetsInput,
+    exerciseEditorRepsInput,
+    exerciseEditorError,
+    setExerciseEditorSetsInput,
+    setExerciseEditorRepsInput,
+    openExerciseEditor,
+    closeExerciseEditor,
+    saveExerciseEditorValues,
+    clearExerciseEditorError,
 
     isDiscardSessionModalOpen,
     openDiscardSessionModal,

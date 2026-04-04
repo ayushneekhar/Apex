@@ -7,7 +7,6 @@ import { useAppStore } from "@/store/use-app-store";
 import { useWorkoutBuilderController } from "./use-workout-builder-controller";
 import { useWorkoutSessionSetActionsController } from "./use-workout-session-set-actions-controller";
 import { useWorkoutSessionUiController } from "./use-workout-session-ui-controller";
-import { useWorkoutSpotifyController } from "./use-workout-spotify-controller";
 
 export function useWorkoutsScreenController() {
   const theme = useAppTheme();
@@ -40,6 +39,9 @@ export function useWorkoutsScreenController() {
   const setSessionSetCustomValues = useAppStore(
     (state) => state.setSessionSetCustomValues
   );
+  const updateActiveSessionExerciseTargets = useAppStore(
+    (state) => state.updateActiveSessionExerciseTargets
+  );
   const finishActiveWorkoutSession = useAppStore(
     (state) => state.finishActiveWorkoutSession
   );
@@ -49,6 +51,7 @@ export function useWorkoutsScreenController() {
 
   const builder = useWorkoutBuilderController({
     weightUnit: settings.weightUnit,
+    workoutCount: workouts.length,
     clearStoreError: clearError,
     addWorkout,
     editWorkout,
@@ -66,21 +69,19 @@ export function useWorkoutsScreenController() {
 
   const sessionSetActions = useWorkoutSessionSetActionsController({
     activeSession,
+    workouts,
     weightUnit: settings.weightUnit,
     now: sessionUi.now,
     setSessionActionError: sessionUi.setSessionActionError,
     closeSessionScreen: sessionUi.closeSessionScreen,
     decrementOrCompleteSessionSet,
     setSessionSetCustomValues,
+    updateActiveSessionExerciseTargets,
+    editWorkout,
     finishActiveWorkoutSession,
     discardActiveWorkoutSession,
   });
 
-  const spotify = useWorkoutSpotifyController({
-    activeSession,
-    isSessionScreenOpen: sessionUi.isSessionScreenOpen,
-    now: sessionUi.now,
-  });
   const { now: _sessionNow, ...sessionUiPublic } = sessionUi;
 
   const sessionDateFormatter = useMemo(
@@ -110,6 +111,22 @@ export function useWorkoutsScreenController() {
     return latest as { workoutId: string; name: string; performedAt: number } | null;
   }, [workouts]);
 
+  const nextScheduledWorkout = useMemo(() => {
+    if (!lastCompletedWorkout || workouts.length < 2) {
+      return null;
+    }
+
+    const lastWorkoutIndex = workouts.findIndex(
+      (workout) => workout.id === lastCompletedWorkout.workoutId
+    );
+
+    if (lastWorkoutIndex < 0) {
+      return null;
+    }
+
+    return workouts[(lastWorkoutIndex + 1) % workouts.length] ?? null;
+  }, [lastCompletedWorkout, workouts]);
+
   async function beginWorkout(workoutId: string) {
     builder.clearFormError();
     await sessionUi.beginWorkout(workoutId);
@@ -130,12 +147,10 @@ export function useWorkoutsScreenController() {
     beginWorkout,
 
     ...sessionSetActions,
-
-    ...spotify,
-
     compactHero,
     moveTrackerCardToBottom,
     lastCompletedWorkout,
+    nextScheduledWorkout,
 
     applyWeeklyOverload,
     removeWorkout,

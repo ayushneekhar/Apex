@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { triggerSuccessHaptic } from "@/lib/haptics";
+import {
+  triggerLightImpactHaptic,
+  triggerLongPressHaptic,
+  triggerSuccessHaptic,
+} from "@/lib/haptics";
 import {
   cancelScheduledNotification,
   scheduleRestCompleteNotification,
@@ -480,10 +484,12 @@ export function useWorkoutSessionSetActionsController({
   }
 
   function handleSetWeightPress(setEntry: ActiveWorkoutSet) {
+    triggerLightImpactHaptic();
     openCustomSetModal(setEntry, "weight");
   }
 
   function handleSetLongPress(setEntry: ActiveWorkoutSet) {
+    triggerLongPressHaptic();
     openCustomSetModal(setEntry, "reps");
   }
 

@@ -55,7 +55,7 @@ jobs:
       release_notes: ${{ steps.prepare.outputs.release_notes }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -161,12 +161,12 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
           cache: yarn
@@ -236,7 +236,7 @@ jobs:
 
       - name: Upload built OTA artifact
         if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: nitro-ota-${{ matrix.platform }}-${{ needs.prepare.outputs.ota_version }}
           path: .artifacts/nitro-ota/${{ matrix.platform }}

@@ -1,7 +1,7 @@
 {
   "platform": "ios",
   "appVersion": "1.1.1",
-  "otaVersion": "2",
+  "otaVersion": "3",
   "bundleName": "main.jsbundle",
-  "generatedAt": "2026-04-04T12:00:52.864Z"
+  "generatedAt": "2026-04-04T12:09:54.205Z"
 }

@@ -1,10 +1,10 @@
 {
-  "version": "2",
+  "version": "3",
   "isSemver": false,
   "targetVersions": {
     "android": [
       "1.1.1"
     ]
   },
-  "releaseNotes": "Auto OTA from main (f499b1e)"
+  "releaseNotes": "Auto OTA from main (c599268)"
 }

@@ -188,6 +188,9 @@ export function SessionExerciseList({
                       <AppText variant="micro" tone="muted">
                         / {setEntry.targetReps}
                       </AppText>
+                      <AppText variant="micro" tone="muted">
+                        Prev {setEntry.previousReps ?? '--'}
+                      </AppText>
                     </Pressable>
 
                     <Pressable

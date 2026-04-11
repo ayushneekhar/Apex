@@ -211,19 +211,32 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
   const mostRecentSession = getMostRecentWorkoutSession(workout);
   const lastSessionWeightByExerciseSet = new Map<string, number>();
   const lastSessionWeightByExerciseNameSet = new Map<string, number>();
+  const lastSessionRepsByExerciseSet = new Map<string, number>();
+  const lastSessionRepsByExerciseNameSet = new Map<string, number>();
 
   mostRecentSession?.sets.forEach((setEntry) => {
-    if (!Number.isFinite(setEntry.weightKg)) {
+    if (Number.isFinite(setEntry.weightKg)) {
+      lastSessionWeightByExerciseSet.set(
+        getSessionSetIdLookupKey(setEntry.workoutExerciseId, setEntry.setNumber),
+        setEntry.weightKg
+      );
+      lastSessionWeightByExerciseNameSet.set(
+        getSessionSetNameLookupKey(setEntry.exerciseName, setEntry.setNumber),
+        setEntry.weightKg
+      );
+    }
+
+    if (!Number.isFinite(setEntry.reps) || setEntry.reps < 0) {
       return;
     }
 
-    lastSessionWeightByExerciseSet.set(
+    lastSessionRepsByExerciseSet.set(
       getSessionSetIdLookupKey(setEntry.workoutExerciseId, setEntry.setNumber),
-      setEntry.weightKg
+      Math.floor(setEntry.reps)
     );
-    lastSessionWeightByExerciseNameSet.set(
+    lastSessionRepsByExerciseNameSet.set(
       getSessionSetNameLookupKey(setEntry.exerciseName, setEntry.setNumber),
-      setEntry.weightKg
+      Math.floor(setEntry.reps)
     );
   });
 
@@ -232,6 +245,10 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
 
     return Array.from({ length: exercise.sets }, (_, index) => {
       const setNumber = index + 1;
+      const previousReps =
+        lastSessionRepsByExerciseSet.get(getSessionSetIdLookupKey(exercise.id, setNumber)) ??
+        lastSessionRepsByExerciseNameSet.get(getSessionSetNameLookupKey(exercise.name, setNumber)) ??
+        null;
       const actualWeightKg =
         lastSessionWeightByExerciseSet.get(getSessionSetIdLookupKey(exercise.id, setNumber)) ??
         lastSessionWeightByExerciseNameSet.get(getSessionSetNameLookupKey(exercise.name, setNumber)) ??
@@ -244,6 +261,7 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
         sortOrder: exercise.sortOrder,
         setNumber,
         targetReps: exercise.reps,
+        previousReps,
         targetWeightKg,
         actualWeightKg,
         restSeconds: exercise.restSeconds,
@@ -858,6 +876,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           id: createId('active_set'),
           setNumber: index + 1,
           targetReps: normalizedReps,
+          previousReps: null,
           actualWeightKg: templateSet.actualWeightKg,
           actualReps: 0,
           completedAt: null,

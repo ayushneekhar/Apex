@@ -329,6 +329,12 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
     currentExerciseId: normalizedCurrentExerciseId,
     sets: session.sets.map((set) => ({
       ...set,
+      previousReps:
+        typeof set.previousReps === 'number' &&
+        Number.isFinite(set.previousReps) &&
+        set.previousReps >= 0
+          ? Math.floor(set.previousReps)
+          : null,
       actualWeightKg:
         typeof set.actualWeightKg === 'number' && Number.isFinite(set.actualWeightKg)
           ? set.actualWeightKg

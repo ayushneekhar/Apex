@@ -14,6 +14,7 @@ export function SavedWorkoutsSection({
   controller: WorkoutsScreenController;
 }) {
   const { theme } = controller;
+  const displayedWorkouts = controller.orderedWorkouts;
 
   return (
     <View style={styles.list}>
@@ -47,7 +48,7 @@ export function SavedWorkoutsSection({
       {controller.error ? <ErrorNotice message={controller.error} /> : null}
       {controller.sessionActionError ? <ErrorNotice message={controller.sessionActionError} /> : null}
 
-      {controller.workouts.length === 0 ? (
+      {displayedWorkouts.length === 0 ? (
         <View
           style={[
             styles.emptyCard,
@@ -64,7 +65,7 @@ export function SavedWorkoutsSection({
         </View>
       ) : null}
 
-      {controller.workouts.map((workout) => (
+      {displayedWorkouts.map((workout) => (
         <SavedWorkoutCard key={workout.id} controller={controller} workout={workout} />
       ))}
     </View>

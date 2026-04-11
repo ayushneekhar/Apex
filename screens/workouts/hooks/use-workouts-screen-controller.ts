@@ -127,6 +127,30 @@ export function useWorkoutsScreenController() {
     return workouts[(lastWorkoutIndex + 1) % workouts.length] ?? null;
   }, [lastCompletedWorkout, workouts]);
 
+  const orderedWorkouts = useMemo(() => {
+    const nextWorkoutId = nextScheduledWorkout?.id ?? null;
+    const previousWorkoutId = lastCompletedWorkout?.workoutId ?? null;
+
+    if (!nextWorkoutId || !previousWorkoutId || nextWorkoutId === previousWorkoutId) {
+      return workouts;
+    }
+
+    const nextWorkout = workouts.find((workout) => workout.id === nextWorkoutId) ?? null;
+    const previousWorkout = workouts.find((workout) => workout.id === previousWorkoutId) ?? null;
+
+    if (!nextWorkout || !previousWorkout) {
+      return workouts;
+    }
+
+    return [
+      nextWorkout,
+      ...workouts.filter(
+        (workout) => workout.id !== nextWorkoutId && workout.id !== previousWorkoutId
+      ),
+      previousWorkout,
+    ];
+  }, [lastCompletedWorkout, nextScheduledWorkout, workouts]);
+
   async function beginWorkout(workoutId: string) {
     builder.clearFormError();
     await sessionUi.beginWorkout(workoutId);
@@ -149,6 +173,7 @@ export function useWorkoutsScreenController() {
     ...sessionSetActions,
     compactHero,
     moveTrackerCardToBottom,
+    orderedWorkouts,
     lastCompletedWorkout,
     nextScheduledWorkout,
 

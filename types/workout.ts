@@ -101,6 +101,7 @@ export type ActiveWorkoutSet = {
   sortOrder: number;
   setNumber: number;
   targetReps: number;
+  previousReps: number | null;
   targetWeightKg: number;
   actualWeightKg: number;
   restSeconds: number;

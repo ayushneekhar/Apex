@@ -267,6 +267,8 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
     session.bodyweightKg === undefined || session.bodyweightKg === null ? null : session.bodyweightKg;
   const normalizedCurrentExerciseId =
     typeof session.currentExerciseId === 'string' ? session.currentExerciseId : null;
+  const normalizedRestTimer =
+    session.restTimer && typeof session.restTimer === 'object' ? session.restTimer : null;
 
   if (
     typeof session.workoutId !== 'string' ||
@@ -277,6 +279,13 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
     (session.pauseStartedAt !== null && typeof session.pauseStartedAt !== 'number') ||
     typeof session.isPaused !== 'boolean' ||
     typeof session.restoredFromAppClose !== 'boolean' ||
+    (normalizedRestTimer !== null &&
+      (typeof normalizedRestTimer.setId !== 'string' ||
+        typeof normalizedRestTimer.exerciseName !== 'string' ||
+        typeof normalizedRestTimer.startedAt !== 'number' ||
+        typeof normalizedRestTimer.endsAt !== 'number' ||
+        typeof normalizedRestTimer.durationMs !== 'number' ||
+        typeof normalizedRestTimer.notificationId !== 'string')) ||
     !Array.isArray(session.sets)
   ) {
     return null;
@@ -327,6 +336,17 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
     isPaused: session.isPaused,
     restoredFromAppClose: session.restoredFromAppClose,
     currentExerciseId: normalizedCurrentExerciseId,
+    restTimer:
+      normalizedRestTimer === null
+        ? null
+        : {
+            setId: normalizedRestTimer.setId,
+            exerciseName: normalizedRestTimer.exerciseName,
+            startedAt: normalizedRestTimer.startedAt,
+            endsAt: normalizedRestTimer.endsAt,
+            durationMs: normalizedRestTimer.durationMs,
+            notificationId: normalizedRestTimer.notificationId,
+          },
     sets: session.sets.map((set) => ({
       ...set,
       previousReps:

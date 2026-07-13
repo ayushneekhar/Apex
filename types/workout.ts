@@ -110,6 +110,15 @@ export type ActiveWorkoutSet = {
   completedAt: number | null;
 };
 
+export type ActiveRestTimer = {
+  setId: string;
+  exerciseName: string;
+  startedAt: number;
+  endsAt: number;
+  durationMs: number;
+  notificationId: string;
+};
+
 export type ActiveWorkoutSession = {
   workoutId: string;
   workoutName: string;
@@ -120,5 +129,6 @@ export type ActiveWorkoutSession = {
   isPaused: boolean;
   restoredFromAppClose: boolean;
   currentExerciseId: string | null;
+  restTimer: ActiveRestTimer | null;
   sets: ActiveWorkoutSet[];
 };

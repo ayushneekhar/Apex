@@ -6,27 +6,19 @@ import {
   triggerSuccessHaptic,
 } from "@/lib/haptics";
 import {
-  cancelScheduledNotification,
-  scheduleRestCompleteNotification,
-} from "@/lib/rest-notifications";
-import {
   formatWeightInputFromKg,
   parseWeightInputToKg,
   type WeightUnit,
 } from "@/lib/weight";
 import type {
+  ActiveRestTimer,
   ActiveWorkoutSession,
   ActiveWorkoutSet,
   NewWorkoutExerciseInput,
   Workout,
 } from "@/types/workout";
 
-import type {
-  ActiveRestTimer,
-  CustomSetEditMode,
-  CustomWeightApplyScope,
-} from "../types";
-import { clampRestSeconds } from "../utils";
+import type { CustomSetEditMode, CustomWeightApplyScope } from "../types";
 
 type SessionSetActionsDeps = {
   activeSession: ActiveWorkoutSession | null;
@@ -111,14 +103,6 @@ function getRestOvertimeMs(
   return Math.max(0, now - activeRestTimer.endsAt);
 }
 
-async function cancelRestNotificationIfPresent(notificationId: string | null) {
-  if (!notificationId) {
-    return;
-  }
-
-  await cancelScheduledNotification(notificationId);
-}
-
 function resolveCustomSetValues({
   setEntry,
   editMode,
@@ -171,13 +155,6 @@ export function useWorkoutSessionSetActionsController({
   finishActiveWorkoutSession,
   discardActiveWorkoutSession,
 }: SessionSetActionsDeps) {
-  const [activeRestTimer, setActiveRestTimer] =
-    useState<ActiveRestTimer | null>(null);
-  const [restNotificationId, setRestNotificationId] = useState<string | null>(
-    null
-  );
-  const restScheduleTokenRef = useRef(0);
-
   const [customSetId, setCustomSetId] = useState<string | null>(null);
   const [customSetEditMode, setCustomSetEditMode] =
     useState<CustomSetEditMode>("reps");
@@ -217,6 +194,7 @@ export function useWorkoutSessionSetActionsController({
         : null,
     [activeSession, workouts]
   );
+  const activeRestTimer = activeSession?.restTimer ?? null;
 
   const restRemainingMs = useMemo(
     () => getRestRemainingMs(activeRestTimer, now),
@@ -237,23 +215,8 @@ export function useWorkoutSessionSetActionsController({
       closeCustomSetModal();
       closeExerciseEditor();
       setIsDiscardSessionModalOpen(false);
-      setActiveRestTimer(null);
-
-      if (restNotificationId) {
-        void cancelRestNotificationIfPresent(restNotificationId);
-        setRestNotificationId(null);
-      }
     }
-  }, [activeSession, restNotificationId]);
-
-  useEffect(() => {
-    if (!activeRestTimer || restRemainingMs > 0 || !restNotificationId) {
-      return;
-    }
-
-    void cancelRestNotificationIfPresent(restNotificationId);
-    setRestNotificationId(null);
-  }, [activeRestTimer, restRemainingMs, restNotificationId]);
+  }, [activeSession]);
 
   function openCustomSetModal(
     setEntry: ActiveWorkoutSet,
@@ -423,51 +386,6 @@ export function useWorkoutSessionSetActionsController({
     closeExerciseEditor();
   }
 
-  async function clearRestTimer() {
-    restScheduleTokenRef.current += 1;
-
-    const notificationToCancel = restNotificationId;
-    setActiveRestTimer(null);
-    setRestNotificationId(null);
-
-    await cancelRestNotificationIfPresent(notificationToCancel);
-  }
-
-  async function startRestTimer(setEntry: ActiveWorkoutSet) {
-    const restSeconds = clampRestSeconds(setEntry.restSeconds);
-    const durationMs = restSeconds * 1000;
-    const startedAt = Date.now();
-    const nextToken = restScheduleTokenRef.current + 1;
-    restScheduleTokenRef.current = nextToken;
-
-    const notificationToCancel = restNotificationId;
-
-    setActiveRestTimer({
-      setId: setEntry.id,
-      exerciseName: setEntry.exerciseName,
-      startedAt,
-      endsAt: startedAt + durationMs,
-      durationMs,
-    });
-    setRestNotificationId(null);
-
-    if (notificationToCancel) {
-      await cancelRestNotificationIfPresent(notificationToCancel);
-    }
-
-    const nextNotificationId = await scheduleRestCompleteNotification(
-      restSeconds,
-      setEntry.exerciseName
-    );
-
-    if (restScheduleTokenRef.current !== nextToken) {
-      await cancelRestNotificationIfPresent(nextNotificationId);
-      return;
-    }
-
-    setRestNotificationId(nextNotificationId);
-  }
-
   async function handleSetPress(setEntry: ActiveWorkoutSet) {
     try {
       const result = await decrementOrCompleteSessionSet(setEntry.id);
@@ -475,7 +393,6 @@ export function useWorkoutSessionSetActionsController({
 
       if (result.shouldStartRest && result.restSet) {
         triggerSuccessHaptic();
-        await startRestTimer(result.restSet);
         return;
       }
     } catch {
@@ -504,7 +421,6 @@ export function useWorkoutSessionSetActionsController({
 
   async function handleDiscardSession() {
     try {
-      await clearRestTimer();
       await discardActiveWorkoutSession();
       closeSessionScreen();
       setIsDiscardSessionModalOpen(false);
@@ -515,7 +431,6 @@ export function useWorkoutSessionSetActionsController({
 
   async function handleFinishSession() {
     try {
-      await clearRestTimer();
       await finishActiveWorkoutSession();
       closeSessionScreen();
     } catch {

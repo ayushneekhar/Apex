@@ -17,7 +17,7 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import { AppState, Pressable, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import {
@@ -31,6 +31,10 @@ import type { AppTheme } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { triggerSelectionHaptic } from "@/lib/haptics";
+import {
+  configureRestNotifications,
+  syncRestCompleteNotification,
+} from "@/lib/rest-notifications";
 import {
   checkNitroOtaForUpdates,
   confirmNitroOtaBundleIfAvailable,
@@ -191,6 +195,9 @@ export default function App() {
   const bootstrapError = useAppStore((state) => state.error);
   const hydrated = useAppStore((state) => state.hydrated);
   const bootstrap = useAppStore((state) => state.bootstrap);
+  const activeRestTimer = useAppStore(
+    (state) => state.activeSession?.restTimer ?? null
+  );
   const updateCheck = useAppStore((state) => state.nitroOtaUpdateCheck);
   const setNitroOtaUpdateCheck = useAppStore(
     (state) => state.setNitroOtaUpdateCheck
@@ -206,6 +213,27 @@ export default function App() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  useEffect(() => {
+    void configureRestNotifications().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const syncNotification = () => {
+      if (activeRestTimer?.endsAt && activeRestTimer.endsAt > Date.now()) {
+        void syncRestCompleteNotification(activeRestTimer).catch(() => undefined);
+      }
+    };
+
+    syncNotification();
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        syncNotification();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [activeRestTimer]);
 
   useEffect(() => {
     return subscribeNitroOtaRollbacks((record) => {

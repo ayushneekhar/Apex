@@ -1,10 +1,16 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
+import type { ActiveRestTimer } from '@/types/workout';
+
 const REST_TIMER_CHANNEL_ID = 'rest-timer';
 
 let notificationHandlerConfigured = false;
 let restChannelConfigured = false;
+
+export function createRestNotificationId(setId: string, endsAt: number): string {
+  return `rest-timer:${setId}:${endsAt}`;
+}
 
 function configureNotificationHandler() {
   if (notificationHandlerConfigured) {
@@ -48,7 +54,7 @@ async function ensureRestNotificationChannel() {
   restChannelConfigured = true;
 }
 
-async function hasNotificationPermission(): Promise<boolean> {
+async function hasNotificationPermission(requestIfNeeded: boolean): Promise<boolean> {
   if (Platform.OS === 'web') {
     return false;
   }
@@ -59,7 +65,7 @@ async function hasNotificationPermission(): Promise<boolean> {
     return true;
   }
 
-  if (!current.canAskAgain) {
+  if (!requestIfNeeded || !current.canAskAgain) {
     return false;
   }
 
@@ -67,35 +73,81 @@ async function hasNotificationPermission(): Promise<boolean> {
   return requested.granted || isIosStatusGranted(requested);
 }
 
-export async function scheduleRestCompleteNotification(
-  seconds: number,
-  exerciseName: string
-): Promise<string | null> {
+export async function configureRestNotifications(): Promise<void> {
+  if (Platform.OS === 'web') {
+    return;
+  }
+
   configureNotificationHandler();
+  await ensureRestNotificationChannel();
+}
 
-  const hasPermission = await hasNotificationPermission();
+export async function requestRestNotificationPermission(): Promise<boolean> {
+  await configureRestNotifications();
+  return hasNotificationPermission(true);
+}
 
-  if (!hasPermission) {
+export async function isRestNotificationScheduled(notificationId: string): Promise<boolean> {
+  if (Platform.OS === 'web') {
+    return false;
+  }
+
+  const requests = await Notifications.getAllScheduledNotificationsAsync();
+  return requests.some((request) => request.identifier === notificationId);
+}
+
+export async function scheduleRestCompleteNotification(
+  restTimer: ActiveRestTimer,
+  requestPermission = true
+): Promise<string | null> {
+  await configureRestNotifications();
+
+  const hasPermission = await hasNotificationPermission(requestPermission);
+
+  if (!hasPermission || restTimer.endsAt <= Date.now()) {
     return null;
   }
 
-  await ensureRestNotificationChannel();
-
   const notificationId = await Notifications.scheduleNotificationAsync({
+    identifier: restTimer.notificationId,
     content: {
       title: 'Rest complete',
-      body: `${exerciseName}: You can start your next set now.`,
+      body: `${restTimer.exerciseName}: You can start your next set now.`,
       sound: 'default',
+      data: {
+        type: 'rest-complete',
+        setId: restTimer.setId,
+        endsAt: restTimer.endsAt,
+      },
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-      seconds: Math.max(1, Math.round(seconds)),
-      repeats: false,
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date: new Date(restTimer.endsAt),
       ...(Platform.OS === 'android' ? { channelId: REST_TIMER_CHANNEL_ID } : {}),
     },
   });
 
   return notificationId;
+}
+
+export async function syncRestCompleteNotification(
+  restTimer: ActiveRestTimer | null
+): Promise<string | null> {
+  if (!restTimer || restTimer.endsAt <= Date.now()) {
+    return null;
+  }
+
+  await configureRestNotifications();
+
+  if (!(await hasNotificationPermission(false))) {
+    return null;
+  }
+
+  if (await isRestNotificationScheduled(restTimer.notificationId)) {
+    return restTimer.notificationId;
+  }
+
+  return scheduleRestCompleteNotification(restTimer, false);
 }
 
 export async function cancelScheduledNotification(notificationId: string | null) {

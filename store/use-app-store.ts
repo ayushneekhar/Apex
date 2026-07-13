@@ -22,9 +22,17 @@ import {
   updateWorkoutSession,
 } from '@/lib/database';
 import { createId } from '@/lib/id';
+import {
+  cancelScheduledNotification,
+  createRestNotificationId,
+  requestRestNotificationPermission,
+  scheduleRestCompleteNotification,
+  syncRestCompleteNotification,
+} from '@/lib/rest-notifications';
 import type { NitroOtaUpdateCheck } from '@/lib/nitro-ota';
 import type { WeightUnit } from '@/lib/weight';
 import type {
+  ActiveRestTimer,
   ActiveWorkoutSession,
   ActiveWorkoutSet,
   AppSettings,
@@ -207,6 +215,20 @@ function getNextCurrentExerciseIdAfterCompletion(
   return getFirstPendingExerciseId(session);
 }
 
+function buildActiveRestTimer(setEntry: ActiveWorkoutSet, startedAt: number): ActiveRestTimer {
+  const durationMs = Math.max(1, Math.floor(setEntry.restSeconds)) * 1000;
+  const endsAt = startedAt + durationMs;
+
+  return {
+    setId: setEntry.id,
+    exerciseName: setEntry.exerciseName,
+    startedAt,
+    endsAt,
+    durationMs,
+    notificationId: createRestNotificationId(setEntry.id, endsAt),
+  };
+}
+
 function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
   const mostRecentSession = getMostRecentWorkoutSession(workout);
   const lastSessionWeightByExerciseSet = new Map<string, number>();
@@ -349,6 +371,18 @@ async function loadPersistedState(): Promise<PersistedState> {
       currentExerciseId: getFirstPendingExerciseId(activeSession),
     };
     await saveActiveWorkoutSession(activeSession);
+  }
+
+  if (activeSession?.restTimer) {
+    try {
+      if (activeSession.restTimer.endsAt <= Date.now()) {
+        await cancelScheduledNotification(activeSession.restTimer.notificationId);
+      } else {
+        await syncRestCompleteNotification(activeSession.restTimer);
+      }
+    } catch {
+      // Notification recovery must never prevent the rest of the app from loading.
+    }
   }
 
   return {
@@ -621,9 +655,11 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       isPaused: false,
       restoredFromAppClose: false,
       currentExerciseId: workout.exercises[0]?.id ?? null,
+      restTimer: null,
       sets: buildSessionSets(workout),
     };
 
+    void requestRestNotificationPermission().catch(() => false);
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
   },
@@ -687,6 +723,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     let completedSupersetExerciseId: string | null = null;
     let decrementedExerciseId: string | null = null;
     let shouldStartRest = false;
+    const completedAt = Date.now();
     const nextSets = session.sets.map((setEntry) => {
       if (setEntry.id !== setId) {
         return setEntry;
@@ -698,7 +735,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         completedSet = {
           ...setEntry,
           actualReps: setEntry.targetReps,
-          completedAt: Date.now(),
+          completedAt,
         };
         completedSupersetExerciseId = setEntry.supersetExerciseId;
         shouldStartRest = true;
@@ -736,12 +773,53 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             getFirstPendingExerciseId(updatedSession),
     };
 
-    await saveActiveWorkoutSession(nextSession);
-    set({ activeSession: nextSession, error: null });
-
     const shouldSkipRestForSuperset =
       completedSupersetExerciseId !== null &&
       nextSession.currentExerciseId === completedSupersetExerciseId;
+    const nextRestTimer =
+      completedSet && shouldStartRest && !shouldSkipRestForSuperset
+        ? buildActiveRestTimer(completedSet, completedAt)
+        : nextSession.restTimer;
+    const nextSessionWithRestTimer = {
+      ...nextSession,
+      restTimer: nextRestTimer,
+    };
+    const previousRestTimer = session.restTimer;
+
+    set({ activeSession: nextSessionWithRestTimer, error: null });
+
+    const notificationUpdate = (async () => {
+      if (
+        previousRestTimer?.notificationId &&
+        previousRestTimer.notificationId !== nextRestTimer?.notificationId
+      ) {
+        await cancelScheduledNotification(previousRestTimer.notificationId);
+      }
+
+      if (
+        nextRestTimer &&
+        nextRestTimer.notificationId !== previousRestTimer?.notificationId
+      ) {
+        await scheduleRestCompleteNotification(nextRestTimer);
+      }
+    })().catch(() => undefined);
+
+    try {
+      await saveActiveWorkoutSession(nextSessionWithRestTimer);
+      await notificationUpdate;
+    } catch (error) {
+      await notificationUpdate;
+
+      if (
+        nextRestTimer?.notificationId &&
+        nextRestTimer.notificationId !== previousRestTimer?.notificationId
+      ) {
+        await cancelScheduledNotification(nextRestTimer.notificationId).catch(() => undefined);
+      }
+
+      set({ activeSession: session, error: errorMessage(error) });
+      throw error;
+    }
 
     return {
       shouldStartRest: shouldStartRest && !shouldSkipRestForSuperset,
@@ -910,6 +988,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const finishedAt = Date.now();
 
+      if (session.restTimer?.notificationId) {
+        await cancelScheduledNotification(session.restTimer.notificationId).catch(() => undefined);
+      }
+
       await createWorkoutSession({
         workoutId: session.workoutId,
         performedAt: finishedAt,
@@ -959,6 +1041,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
 
     try {
+      if (session.restTimer?.notificationId) {
+        await cancelScheduledNotification(session.restTimer.notificationId).catch(() => undefined);
+      }
+
       await clearActiveWorkoutSession();
       set({ activeSession: null, error: null });
     } catch (error) {

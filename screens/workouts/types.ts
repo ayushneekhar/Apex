@@ -26,14 +26,6 @@ export type ActiveSetGroup = {
   sets: ActiveWorkoutSet[];
 };
 
-export type ActiveRestTimer = {
-  setId: string;
-  exerciseName: string;
-  startedAt: number;
-  endsAt: number;
-  durationMs: number;
-};
-
 export type CustomSetEditMode = 'reps' | 'weight';
 
 export type CustomWeightApplyScope = 'current' | 'remaining' | 'all';

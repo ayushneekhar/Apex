@@ -43,6 +43,7 @@ export type WorkoutBuilderViewController = {
   exerciseDrafts: ExerciseDraft[];
   formError: string | null;
   selectedExercises: Set<string>;
+  filteredExerciseLibrary: readonly string[];
   defaultOverload: string;
   clearFormError: () => void;
   setWorkoutName: (value: string) => void;

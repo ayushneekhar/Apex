@@ -2,7 +2,7 @@ import { useCallback, useState, type ComponentProps } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
@@ -52,6 +52,26 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
 
     void controller.beginWorkout(workout.id);
   }, [controller, isApplyingOverload, workout.id]);
+
+  const handleArchiveWorkout = useCallback(() => {
+    Alert.alert(
+      'Archive template?',
+      `Archive ${workout.name}? Its workout history will stay in your logs and you can restore it from Settings.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Archive',
+          style: 'destructive',
+          onPress: () => {
+            void controller.archiveWorkout(workout.id);
+          },
+        },
+      ]
+    );
+  }, [controller, workout.id, workout.name]);
 
   const handleApplyOverload = useCallback(async () => {
     if (isApplyingOverload) {
@@ -143,7 +163,7 @@ export function SavedWorkoutCard({ controller, workout }: Props) {
             <Pressable
               onPress={(event) => {
                 event.stopPropagation();
-                void controller.removeWorkout(workout.id);
+                handleArchiveWorkout();
               }}
               hitSlop={8}
               style={({ pressed }) => [

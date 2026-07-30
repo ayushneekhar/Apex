@@ -4,10 +4,10 @@ import type { ThemeId } from '@/constants/app-themes';
 import {
   DEFAULT_SETTINGS,
   advanceWorkoutWeek,
+  archiveWorkout as archiveWorkoutInDatabase,
   clearActiveWorkoutSession,
   createWorkout,
   createWorkoutSession,
-  deleteWorkout,
   exportDatabaseBackup,
   importDatabaseBackupBytes,
   importDatabaseBackup,
@@ -15,6 +15,7 @@ import {
   listWorkouts,
   loadActiveWorkoutSession,
   loadSettings,
+  restoreWorkout as restoreWorkoutInDatabase,
   saveActiveWorkoutSession,
   saveThemeSetting,
   saveWeightUnitSetting,
@@ -67,7 +68,8 @@ type AppStoreState = {
   addWorkoutSession: (input: NewWorkoutSessionInput) => Promise<void>;
   editWorkoutSession: (input: UpdateWorkoutSessionInput) => Promise<void>;
   applyWeeklyOverload: (workoutId: string) => Promise<void>;
-  removeWorkout: (workoutId: string) => Promise<void>;
+  archiveWorkout: (workoutId: string) => Promise<void>;
+  restoreWorkout: (workoutId: string) => Promise<void>;
   startWorkoutSession: (workoutId: string) => Promise<void>;
   setActiveWorkoutBodyweight: (bodyweightKg: number | null) => Promise<void>;
   pauseActiveWorkoutSession: () => Promise<void>;
@@ -215,17 +217,58 @@ function getNextCurrentExerciseIdAfterCompletion(
   return getFirstPendingExerciseId(session);
 }
 
-function buildActiveRestTimer(setEntry: ActiveWorkoutSet, startedAt: number): ActiveRestTimer {
-  const durationMs = Math.max(1, Math.floor(setEntry.restSeconds)) * 1000;
+function getExerciseNameForWorkoutExerciseId(
+  session: ActiveWorkoutSession,
+  workoutExerciseId: string | null
+): string | null {
+  if (!workoutExerciseId) {
+    return null;
+  }
+
+  const setEntry = session.sets.find(
+    (candidate) => candidate.workoutExerciseId === workoutExerciseId
+  );
+
+  return setEntry?.exerciseName ?? null;
+}
+
+function getRestTimerExerciseName(
+  session: ActiveWorkoutSession,
+  completedSet: ActiveWorkoutSet
+): string {
+  const exerciseStillPending = session.sets.some(
+    (setEntry) =>
+      setEntry.workoutExerciseId === completedSet.workoutExerciseId &&
+      setEntry.actualReps === 0
+  );
+
+  if (exerciseStillPending) {
+    return completedSet.exerciseName;
+  }
+
+  const nextExerciseName = getExerciseNameForWorkoutExerciseId(
+    session,
+    session.currentExerciseId
+  );
+
+  return nextExerciseName ?? completedSet.exerciseName;
+}
+
+function buildActiveRestTimer(
+  session: ActiveWorkoutSession,
+  completedSet: ActiveWorkoutSet,
+  startedAt: number
+): ActiveRestTimer {
+  const durationMs = Math.max(1, Math.floor(completedSet.restSeconds)) * 1000;
   const endsAt = startedAt + durationMs;
 
   return {
-    setId: setEntry.id,
-    exerciseName: setEntry.exerciseName,
+    setId: completedSet.id,
+    exerciseName: getRestTimerExerciseName(session, completedSet),
     startedAt,
     endsAt,
     durationMs,
-    notificationId: createRestNotificationId(setEntry.id, endsAt),
+    notificationId: createRestNotificationId(completedSet.id, endsAt),
   };
 }
 
@@ -623,11 +666,11 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       set({ mutating: false });
     }
   },
-  removeWorkout: async (workoutId) => {
+  archiveWorkout: async (workoutId) => {
     set({ mutating: true, error: null });
 
     try {
-      await deleteWorkout(workoutId);
+      await archiveWorkoutInDatabase(workoutId);
 
       const activeSession = get().activeSession;
       if (activeSession?.workoutId === workoutId) {
@@ -640,6 +683,20 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         activeSession: activeSession?.workoutId === workoutId ? null : activeSession,
         error: null,
       });
+    } catch (error) {
+      set({ error: errorMessage(error) });
+      throw error;
+    } finally {
+      set({ mutating: false });
+    }
+  },
+  restoreWorkout: async (workoutId) => {
+    set({ mutating: true, error: null });
+
+    try {
+      await restoreWorkoutInDatabase(workoutId);
+      const workouts = await listWorkouts();
+      set({ workouts, error: null });
     } catch (error) {
       set({ error: errorMessage(error) });
       throw error;
@@ -796,7 +853,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       nextSession.currentExerciseId === completedSupersetExerciseId;
     const nextRestTimer =
       completedSet && shouldStartRest && !shouldSkipRestForSuperset
-        ? buildActiveRestTimer(completedSet, completedAt)
+        ? buildActiveRestTimer(nextSession, completedSet, completedAt)
         : nextSession.restTimer;
     const nextSessionWithRestTimer = {
       ...nextSession,

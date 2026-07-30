@@ -716,7 +716,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
 
     const workout = get().workouts.find((item) => item.id === workoutId);
-    if (!workout) {
+    if (!workout || workout.archivedAt !== null) {
       throw new Error('Workout not found.');
     }
 

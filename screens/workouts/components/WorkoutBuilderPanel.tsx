@@ -60,6 +60,9 @@ export function WorkoutBuilderPanel({
       </AppText>
 
       <View style={styles.exerciseChipContainer}>
+        {controller.filteredExerciseLibrary.length === 0 ? (
+          <AppText tone="muted">No matching exercises in the library.</AppText>
+        ) : null}
         {controller.filteredExerciseLibrary.map((exerciseName) => {
           const selected = controller.selectedExercises.has(exerciseName.toLowerCase());
 

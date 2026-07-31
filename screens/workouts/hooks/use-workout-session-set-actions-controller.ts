@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { EXERCISE_LIBRARY } from "@/constants/exercise-library";
+
 import {
   triggerLightImpactHaptic,
   triggerLongPressHaptic,
@@ -42,7 +44,8 @@ type SessionSetActionsDeps = {
   updateActiveSessionExerciseTargets: (
     workoutExerciseId: string,
     sets: number,
-    reps: number
+    reps: number,
+    exerciseName?: string
   ) => Promise<void>;
   editWorkout: (input: {
     id: string;
@@ -164,6 +167,7 @@ export function useWorkoutSessionSetActionsController({
   const [customWeightApplyScope, setCustomWeightApplyScope] =
     useState<CustomWeightApplyScope>("current");
   const [exerciseEditorExerciseId, setExerciseEditorExerciseId] = useState<string | null>(null);
+  const [exerciseEditorNameInput, setExerciseEditorNameInput] = useState("");
   const [exerciseEditorSetsInput, setExerciseEditorSetsInput] = useState("");
   const [exerciseEditorRepsInput, setExerciseEditorRepsInput] = useState("");
   const [exerciseEditorError, setExerciseEditorError] = useState<string | null>(null);
@@ -194,6 +198,17 @@ export function useWorkoutSessionSetActionsController({
         : null,
     [activeSession, workouts]
   );
+  const exerciseEditorFilteredLibrary = useMemo(() => {
+    const query = exerciseEditorNameInput.trim().toLowerCase();
+
+    if (!query) {
+      return EXERCISE_LIBRARY;
+    }
+
+    return EXERCISE_LIBRARY.filter((exerciseName) =>
+      exerciseName.toLowerCase().includes(query)
+    );
+  }, [exerciseEditorNameInput]);
   const activeRestTimer = activeSession?.restTimer ?? null;
 
   const restRemainingMs = useMemo(
@@ -251,6 +266,7 @@ export function useWorkoutSessionSetActionsController({
     }
 
     setExerciseEditorExerciseId(workoutExerciseId);
+    setExerciseEditorNameInput(selectedSets[0]?.exerciseName ?? "");
     setExerciseEditorSetsInput(String(selectedSets.length));
     setExerciseEditorRepsInput(String(selectedSets[0]?.targetReps ?? 0));
     setExerciseEditorError(null);
@@ -258,6 +274,7 @@ export function useWorkoutSessionSetActionsController({
 
   function closeExerciseEditor() {
     setExerciseEditorExerciseId(null);
+    setExerciseEditorNameInput("");
     setExerciseEditorSetsInput("");
     setExerciseEditorRepsInput("");
     setExerciseEditorError(null);
@@ -301,6 +318,12 @@ export function useWorkoutSessionSetActionsController({
 
     const parsedSets = Number.parseInt(exerciseEditorSetsInput.trim(), 10);
     const parsedReps = Number.parseInt(exerciseEditorRepsInput.trim(), 10);
+    const normalizedExerciseName = exerciseEditorNameInput.trim();
+
+    if (!normalizedExerciseName) {
+      setExerciseEditorError("Exercise name is required.");
+      return;
+    }
 
     if (!Number.isFinite(parsedSets) || parsedSets < 1) {
       setExerciseEditorError("Sets must be 1 or greater.");
@@ -327,7 +350,8 @@ export function useWorkoutSessionSetActionsController({
       await updateActiveSessionExerciseTargets(
         exerciseEditorExerciseId,
         parsedSets,
-        parsedReps
+        parsedReps,
+        normalizedExerciseName
       );
     } catch (error) {
       if (error instanceof Error && error.message) {
@@ -360,7 +384,7 @@ export function useWorkoutSessionSetActionsController({
               exercise.name.trim().toLowerCase() === selectedExerciseName;
 
             return {
-              name: exercise.name,
+              name: isSelectedExercise ? normalizedExerciseName : exercise.name,
               sets: isSelectedExercise ? parsedSets : exercise.sets,
               reps: isSelectedExercise ? parsedReps : exercise.reps,
               restSeconds: exercise.restSeconds,
@@ -473,9 +497,12 @@ export function useWorkoutSessionSetActionsController({
 
     exerciseEditorExerciseId,
     exerciseEditorSets,
+    exerciseEditorNameInput,
+    exerciseEditorFilteredLibrary,
     exerciseEditorSetsInput,
     exerciseEditorRepsInput,
     exerciseEditorError,
+    setExerciseEditorNameInput,
     setExerciseEditorSetsInput,
     setExerciseEditorRepsInput,
     openExerciseEditor,

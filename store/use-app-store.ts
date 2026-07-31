@@ -87,7 +87,8 @@ type AppStoreState = {
   updateActiveSessionExerciseTargets: (
     workoutExerciseId: string,
     sets: number,
-    reps: number
+    reps: number,
+    exerciseName?: string
   ) => Promise<void>;
   finishActiveWorkoutSession: () => Promise<void>;
   discardActiveWorkoutSession: () => Promise<void>;
@@ -974,7 +975,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
   },
-  updateActiveSessionExerciseTargets: async (workoutExerciseId, sets, reps) => {
+  updateActiveSessionExerciseTargets: async (workoutExerciseId, sets, reps, exerciseName) => {
     const session = get().activeSession;
     if (!session) {
       return;
@@ -990,6 +991,13 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       return;
     }
 
+    const currentExerciseName = selectedSets[0]?.exerciseName ?? "";
+    const normalizedExerciseName = exerciseName?.trim() || currentExerciseName;
+
+    if (!normalizedExerciseName) {
+      throw new Error("Exercise name is required.");
+    }
+
     const completedSetCount = selectedSets.filter((setEntry) => setEntry.actualReps > 0).length;
 
     if (normalizedSets < completedSetCount) {
@@ -999,6 +1007,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
 
     let changed = selectedSets.length !== normalizedSets;
+    if (normalizedExerciseName !== currentExerciseName) {
+      changed = true;
+    }
     const templateSet = selectedSets[selectedSets.length - 1] ?? selectedSets[0];
     const nextExerciseSets = Array.from({ length: normalizedSets }, (_, index) => {
       const existingSet = selectedSets[index];
@@ -1010,6 +1021,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
           ...templateSet,
           id: createId('active_set'),
           setNumber: index + 1,
+          exerciseName: normalizedExerciseName,
           targetReps: normalizedReps,
           previousReps: null,
           actualWeightKg: templateSet.actualWeightKg,
@@ -1018,13 +1030,18 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         };
       }
 
-      if (existingSet.setNumber !== index + 1 || existingSet.targetReps !== normalizedReps) {
+      if (
+        existingSet.setNumber !== index + 1 ||
+        existingSet.targetReps !== normalizedReps ||
+        existingSet.exerciseName !== normalizedExerciseName
+      ) {
         changed = true;
       }
 
       return {
         ...existingSet,
         setNumber: index + 1,
+        exerciseName: normalizedExerciseName,
         targetReps: normalizedReps,
       };
     });

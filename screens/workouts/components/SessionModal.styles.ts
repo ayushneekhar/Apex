@@ -49,4 +49,18 @@ export const styles = StyleSheet.create({
   scopeHint: {
     marginTop: -spacing.xxs,
   },
+  exerciseChipContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  exerciseChip: {
+    borderWidth: border.thin,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  modalScrollContent: {
+    gap: spacing.lg,
+  },
 });

@@ -43,16 +43,19 @@ export default function WorkoutTemplateEditorScreen() {
   const clearError = useAppStore((state) => state.clearError);
   const addWorkout = useAppStore((state) => state.addWorkout);
   const editWorkout = useAppStore((state) => state.editWorkout);
-  const removeWorkout = useAppStore((state) => state.removeWorkout);
+  const archiveWorkout = useAppStore((state) => state.archiveWorkout);
 
   const workout = useMemo(
-    () => workouts.find((candidate) => candidate.id === workoutId) ?? null,
+    () =>
+      workouts.find(
+        (candidate) => candidate.id === workoutId && candidate.archivedAt === null
+      ) ?? null,
     [workoutId, workouts]
   );
 
   const builder = useWorkoutBuilderController({
     weightUnit: settings.weightUnit,
-    workoutCount: workouts.length,
+    workoutCount: workouts.filter((candidate) => candidate.archivedAt === null).length,
     clearStoreError: clearError,
     addWorkout,
     editWorkout,
@@ -102,26 +105,26 @@ export default function WorkoutTemplateEditorScreen() {
     return saved;
   };
 
-  const handleDelete = () => {
+  const handleArchive = () => {
     if (!workout) {
       return;
     }
 
     Alert.alert(
-      'Delete template?',
-      `Remove ${workout.name} and all of its logged sessions?`,
+      'Archive template?',
+      `Archive ${workout.name}? Its workout history will stay in your logs and you can restore it from Settings.`,
       [
         {
           text: 'Cancel',
           style: 'cancel',
         },
         {
-          text: 'Delete',
+          text: 'Archive',
           style: 'destructive',
           onPress: () => {
             void (async () => {
               try {
-                await removeWorkout(workout.id);
+                await archiveWorkout(workout.id);
                 navigation.goBack();
               } catch {
                 // Store error state will render in the editor.
@@ -344,10 +347,10 @@ export default function WorkoutTemplateEditorScreen() {
         />
 
         <NeonButton
-          title="Delete Template"
+          title="Archive Template"
           variant="danger"
           style={styles.footerButton}
-          onPress={handleDelete}
+          onPress={handleArchive}
           disabled={mutating}
         />
       </ScrollView>

@@ -4,7 +4,6 @@ import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
 import { NeonInput } from '@/components/ui/neon-input';
 import { designTokens } from '@/constants/design-system';
-import { EXERCISE_LIBRARY } from '@/constants/exercise-library';
 
 import type { WorkoutBuilderViewController } from '../types';
 import { ErrorNotice } from './common/ErrorNotice';
@@ -61,7 +60,10 @@ export function WorkoutBuilderPanel({
       </AppText>
 
       <View style={styles.exerciseChipContainer}>
-        {EXERCISE_LIBRARY.map((exerciseName) => {
+        {controller.filteredExerciseLibrary.length === 0 ? (
+          <AppText tone="muted">No matching exercises in the library.</AppText>
+        ) : null}
+        {controller.filteredExerciseLibrary.map((exerciseName) => {
           const selected = controller.selectedExercises.has(exerciseName.toLowerCase());
 
           return (

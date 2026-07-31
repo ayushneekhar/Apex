@@ -72,6 +72,13 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.md,
   },
+  archivedList: {
+    gap: spacing.sm,
+  },
+  archivedTextWrap: {
+    flex: 1,
+    gap: spacing.xxs,
+  },
   versionContainer: {
     alignItems: 'center',
     gap: spacing.xxs,

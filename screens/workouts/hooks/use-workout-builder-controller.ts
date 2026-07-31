@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 
+import { EXERCISE_LIBRARY } from "@/constants/exercise-library";
 import {
   DEFAULT_REST_SECONDS,
   MAX_REST_SECONDS,
@@ -77,6 +78,18 @@ export function useWorkoutBuilderController({
     () => new Set(exerciseDrafts.map((draft) => draft.name.toLowerCase())),
     [exerciseDrafts]
   );
+
+  const filteredExerciseLibrary = useMemo(() => {
+    const query = customExerciseName.trim().toLowerCase();
+
+    if (!query) {
+      return EXERCISE_LIBRARY;
+    }
+
+    return EXERCISE_LIBRARY.filter((exerciseName) =>
+      exerciseName.toLowerCase().includes(query)
+    );
+  }, [customExerciseName]);
 
   const defaultOverload = useMemo(
     () =>
@@ -359,6 +372,7 @@ export function useWorkoutBuilderController({
     exerciseDrafts,
     formError,
     selectedExercises,
+    filteredExerciseLibrary,
     defaultOverload,
 
     openComposer,

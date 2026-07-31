@@ -2,9 +2,12 @@ import { useMemo } from "react";
 import { useAnimatedStyle } from "react-native-reanimated";
 
 import { useAppTheme } from "@/hooks/use-app-theme";
+import {
+  formatWeightFromKg,
+  getDefaultWeeklyIncrementKg,
+} from "@/lib/weight";
 import { useAppStore } from "@/store/use-app-store";
 
-import { useWorkoutBuilderController } from "./use-workout-builder-controller";
 import { useWorkoutSessionSetActionsController } from "./use-workout-session-set-actions-controller";
 import { useWorkoutSessionUiController } from "./use-workout-session-ui-controller";
 
@@ -18,10 +21,8 @@ export function useWorkoutsScreenController() {
   const activeSession = useAppStore((state) => state.activeSession);
 
   const clearError = useAppStore((state) => state.clearError);
-  const addWorkout = useAppStore((state) => state.addWorkout);
-  const editWorkout = useAppStore((state) => state.editWorkout);
   const applyWeeklyOverload = useAppStore((state) => state.applyWeeklyOverload);
-  const removeWorkout = useAppStore((state) => state.removeWorkout);
+  const archiveWorkout = useAppStore((state) => state.archiveWorkout);
 
   const startWorkoutSession = useAppStore((state) => state.startWorkoutSession);
   const setActiveWorkoutBodyweight = useAppStore(
@@ -48,14 +49,21 @@ export function useWorkoutsScreenController() {
   const discardActiveWorkoutSession = useAppStore(
     (state) => state.discardActiveWorkoutSession
   );
+  const editWorkout = useAppStore((state) => state.editWorkout);
 
-  const builder = useWorkoutBuilderController({
-    weightUnit: settings.weightUnit,
-    workoutCount: workouts.length,
-    clearStoreError: clearError,
-    addWorkout,
-    editWorkout,
-  });
+  const activeWorkouts = useMemo(
+    () => workouts.filter((workout) => workout.archivedAt === null),
+    [workouts]
+  );
+
+  const defaultOverload = useMemo(
+    () =>
+      formatWeightFromKg(
+        getDefaultWeeklyIncrementKg(settings.weightUnit),
+        settings.weightUnit
+      ),
+    [settings.weightUnit]
+  );
 
   const sessionUi = useWorkoutSessionUiController({
     activeSession,
@@ -94,13 +102,13 @@ export function useWorkoutsScreenController() {
     []
   );
 
-  const compactHero = workouts.length > 0 && !builder.isComposerOpen;
-  const moveTrackerCardToBottom = workouts.length > 1;
+  const compactHero = activeWorkouts.length > 0;
+  const moveTrackerCardToBottom = activeWorkouts.length > 1;
 
   const lastCompletedWorkout = useMemo(() => {
     let latest: { workoutId: string; name: string; performedAt: number } | null = null;
 
-    workouts.forEach((workout) => {
+    activeWorkouts.forEach((workout) => {
       workout.sessions.forEach((session) => {
         if (!latest || session.performedAt > latest.performedAt) {
           latest = { workoutId: workout.id, name: workout.name, performedAt: session.performedAt };
@@ -109,14 +117,14 @@ export function useWorkoutsScreenController() {
     });
 
     return latest as { workoutId: string; name: string; performedAt: number } | null;
-  }, [workouts]);
+  }, [activeWorkouts]);
 
   const nextScheduledWorkout = useMemo(() => {
-    if (!lastCompletedWorkout || workouts.length < 2) {
+    if (!lastCompletedWorkout || activeWorkouts.length < 2) {
       return null;
     }
 
-    const lastWorkoutIndex = workouts.findIndex(
+    const lastWorkoutIndex = activeWorkouts.findIndex(
       (workout) => workout.id === lastCompletedWorkout.workoutId
     );
 
@@ -124,48 +132,47 @@ export function useWorkoutsScreenController() {
       return null;
     }
 
-    return workouts[(lastWorkoutIndex + 1) % workouts.length] ?? null;
-  }, [lastCompletedWorkout, workouts]);
+    return activeWorkouts[(lastWorkoutIndex + 1) % activeWorkouts.length] ?? null;
+  }, [activeWorkouts, lastCompletedWorkout]);
 
   const orderedWorkouts = useMemo(() => {
     const nextWorkoutId = nextScheduledWorkout?.id ?? null;
     const previousWorkoutId = lastCompletedWorkout?.workoutId ?? null;
 
     if (!nextWorkoutId || !previousWorkoutId || nextWorkoutId === previousWorkoutId) {
-      return workouts;
+      return activeWorkouts;
     }
 
-    const nextWorkout = workouts.find((workout) => workout.id === nextWorkoutId) ?? null;
-    const previousWorkout = workouts.find((workout) => workout.id === previousWorkoutId) ?? null;
+    const nextWorkout = activeWorkouts.find((workout) => workout.id === nextWorkoutId) ?? null;
+    const previousWorkout =
+      activeWorkouts.find((workout) => workout.id === previousWorkoutId) ?? null;
 
     if (!nextWorkout || !previousWorkout) {
-      return workouts;
+      return activeWorkouts;
     }
 
     return [
       nextWorkout,
-      ...workouts.filter(
+      ...activeWorkouts.filter(
         (workout) => workout.id !== nextWorkoutId && workout.id !== previousWorkoutId
       ),
       previousWorkout,
     ];
-  }, [lastCompletedWorkout, nextScheduledWorkout, workouts]);
+  }, [activeWorkouts, lastCompletedWorkout, nextScheduledWorkout]);
 
   async function beginWorkout(workoutId: string) {
-    builder.clearFormError();
     await sessionUi.beginWorkout(workoutId);
   }
 
   return {
     theme,
-    workouts,
+    workouts: activeWorkouts,
     settings,
     mutating,
     error,
     activeSession,
     sessionDateFormatter,
-
-    ...builder,
+    defaultOverload,
 
     ...sessionUiPublic,
     beginWorkout,
@@ -178,7 +185,7 @@ export function useWorkoutsScreenController() {
     nextScheduledWorkout,
 
     applyWeeklyOverload,
-    removeWorkout,
+    archiveWorkout,
   };
 }
 

@@ -37,6 +37,7 @@ export type Workout = {
   templateOrder: number;
   createdAt: number;
   weeksCompleted: number;
+  archivedAt: number | null;
   exercises: WorkoutExercise[];
   sessions: WorkoutSession[];
 };

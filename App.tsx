@@ -47,6 +47,7 @@ import AnalyticsScreen from "@/screens/AnalyticsScreen";
 import HistoryScreen from "@/screens/HistoryScreen";
 import SessionDetailScreen from "@/screens/SessionDetailScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import WorkoutTemplateCreatorScreen from "@/screens/WorkoutTemplateCreatorScreen";
 import WorkoutTemplateEditorScreen from "@/screens/WorkoutTemplateEditorScreen";
 import WorkoutsScreen from "@/screens/WorkoutsScreen";
 import { useAppStore } from "@/store/use-app-store";
@@ -362,6 +363,10 @@ export default function App() {
               <RootStack.Screen
                 name="SessionDetails"
                 component={SessionDetailScreen}
+              />
+              <RootStack.Screen
+                name="WorkoutTemplateCreator"
+                component={WorkoutTemplateCreatorScreen}
               />
               <RootStack.Screen
                 name="WorkoutTemplateEditor"

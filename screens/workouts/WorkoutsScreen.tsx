@@ -8,7 +8,6 @@ import { designTokens } from "@/constants/design-system";
 import { ActiveSessionOverlay } from "./components/ActiveSessionOverlay";
 import { SavedWorkoutsSection } from "./components/SavedWorkoutsSection";
 import { TrackerHeroCard } from "./components/TrackerHeroCard";
-import { WorkoutBuilderPanel } from "./components/WorkoutBuilderPanel";
 import { useWorkoutsScreenController } from "./hooks/use-workouts-screen-controller";
 import { styles } from "./WorkoutsScreen.styles";
 
@@ -46,10 +45,6 @@ export default function WorkoutsScreen() {
       >
         {!controller.moveTrackerCardToBottom ? (
           <TrackerHeroCard controller={controller} />
-        ) : null}
-
-        {controller.isComposerOpen ? (
-          <WorkoutBuilderPanel controller={controller} />
         ) : null}
 
         <SavedWorkoutsSection controller={controller} />

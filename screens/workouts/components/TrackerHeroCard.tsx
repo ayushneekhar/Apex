@@ -1,7 +1,10 @@
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { View } from 'react-native';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
+import type { RootStackParamList } from '@/types/navigation';
 
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
 import { styles } from './TrackerHeroCard.styles';
@@ -11,7 +14,9 @@ export function TrackerHeroCard({
 }: {
   controller: WorkoutsScreenController;
 }) {
-  const { compactHero, isComposerOpen, defaultOverload, openComposer, closeComposer, theme } = controller;
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { compactHero, defaultOverload, theme } = controller;
 
   return (
     <View
@@ -32,9 +37,9 @@ export function TrackerHeroCard({
             <AppText variant="heading">Workouts ready</AppText>
           </View>
           <NeonButton
-            title={isComposerOpen ? 'Close builder' : 'Add workout'}
+            title="Add workout"
             variant="ghost"
-            onPress={isComposerOpen ? closeComposer : openComposer}
+            onPress={() => navigation.navigate('WorkoutTemplateCreator')}
           />
         </>
       ) : (
@@ -48,9 +53,9 @@ export function TrackerHeroCard({
             {defaultOverload}.
           </AppText>
           <NeonButton
-            title={isComposerOpen ? 'Close builder' : 'Add workout'}
-            variant={isComposerOpen ? 'ghost' : 'primary'}
-            onPress={isComposerOpen ? closeComposer : openComposer}
+            title="Add workout"
+            variant="primary"
+            onPress={() => navigation.navigate('WorkoutTemplateCreator')}
           />
         </>
       )}

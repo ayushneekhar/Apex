@@ -97,7 +97,7 @@ export function ActiveSessionOverlay({
         <SessionSummaryCard controller={controller} />
         <SessionExerciseList controller={controller} />
 
-        {(controller.sessionActionError || controller.error) && !controller.formError ? (
+        {(controller.sessionActionError || controller.error) ? (
           <ErrorNotice message={controller.sessionActionError ?? controller.error ?? ''} />
         ) : null}
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -26,6 +26,9 @@ export default function SettingsScreen() {
   const { layout, opacity } = designTokens;
 
   const settings = useAppStore((state) => state.settings);
+  const workouts = useAppStore((state) => state.workouts);
+  const mutating = useAppStore((state) => state.mutating);
+  const restoreWorkout = useAppStore((state) => state.restoreWorkout);
   const setTheme = useAppStore((state) => state.setTheme);
   const setWeightUnit = useAppStore((state) => state.setWeightUnit);
   const setNitroOtaUpdateCheck = useAppStore(
@@ -44,6 +47,22 @@ export default function SettingsScreen() {
   const defaultIncrement = formatWeightFromKg(
     getDefaultWeeklyIncrementKg(settings.weightUnit),
     settings.weightUnit
+  );
+  const archivedWorkouts = useMemo(
+    () =>
+      workouts
+        .filter((workout) => workout.archivedAt !== null)
+        .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)),
+    [workouts]
+  );
+  const archivedDateFormatter = useMemo(
+    () =>
+      new Intl.DateTimeFormat(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+    []
   );
 
   useEffect(() => {
@@ -323,6 +342,59 @@ export default function SettingsScreen() {
           </View>
 
           {updateStatus ? <AppText tone="muted">{updateStatus}</AppText> : null}
+        </View>
+
+        <View
+          style={[
+            styles.card,
+            {
+              borderColor: theme.palette.border,
+              backgroundColor: theme.palette.panel,
+            },
+          ]}
+        >
+          <AppText variant="heading">Archived Templates</AppText>
+          <AppText tone="muted">
+            Archived workout templates stay out of your workouts list, but their
+            session history remains in History.
+          </AppText>
+
+          {archivedWorkouts.length === 0 ? (
+            <AppText tone="muted">No archived templates.</AppText>
+          ) : (
+            <View style={styles.archivedList}>
+              {archivedWorkouts.map((workout) => (
+                <View
+                  key={workout.id}
+                  style={[
+                    styles.infoRow,
+                    {
+                      borderColor: theme.palette.border,
+                      backgroundColor: theme.palette.panelSoft,
+                    },
+                  ]}
+                >
+                  <View style={styles.archivedTextWrap}>
+                    <AppText variant="label">{workout.name}</AppText>
+                    <AppText variant="micro" tone="muted">
+                      Archived{" "}
+                      {workout.archivedAt
+                        ? archivedDateFormatter.format(new Date(workout.archivedAt))
+                        : "recently"}
+                    </AppText>
+                  </View>
+                  <NeonButton
+                    title="Restore"
+                    variant="ghost"
+                    onPress={() => {
+                      void restoreWorkout(workout.id);
+                    }}
+                    disabled={mutating}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         <View

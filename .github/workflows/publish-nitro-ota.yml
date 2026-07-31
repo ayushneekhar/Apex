@@ -34,6 +34,11 @@ on:
         description: Optional release notes for ota.version.json
         required: false
         type: string
+      ci_auto_publish:
+        description: Internal flag set by CI router to publish production android+ios
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -70,6 +75,7 @@ jobs:
           INPUT_PLATFORM: ${{ inputs.platform }}
           INPUT_TARGET_APP_VERSION: ${{ inputs.target_app_version }}
           INPUT_RELEASE_NOTES: ${{ inputs.release_notes }}
+          INPUT_CI_AUTO_PUBLISH: ${{ inputs.ci_auto_publish }}
         run: |
           set -euo pipefail
 
@@ -86,12 +92,26 @@ jobs:
           APP_VERSION="$(node -p "require('./app.json').expo.version")"
           write_output "target_app_version" "${INPUT_TARGET_APP_VERSION:-$APP_VERSION}"
 
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "${INPUT_CI_AUTO_PUBLISH}" != "true" ]; then
             write_output "deployment_environment" "${INPUT_DEPLOYMENT_ENVIRONMENT}"
             write_output "platforms_json" "[\"${INPUT_PLATFORM}\"]"
             write_output "release_notes" "${INPUT_RELEASE_NOTES}"
             write_output "skip_reason" ""
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "${INPUT_CI_AUTO_PUBLISH}" = "true" ]; then
+            write_output "deployment_environment" "production"
+            write_output "platforms_json" "[\"android\",\"ios\"]"
+            write_output "release_notes" "Auto OTA from main (${HEAD_SHA:0:7})"
+            write_output "skip_reason" ""
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Nitro OTA Auto Publish"
+              echo "Triggered by CI router for JS-only changes."
+              echo "- Target app version: ${APP_VERSION}"
+            } >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 

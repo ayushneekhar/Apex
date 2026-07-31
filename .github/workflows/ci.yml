@@ -11,15 +11,29 @@ on:
     branches: [main]
     paths-ignore:
       - "scripts/ota/ota-bundle-version.json"
+  workflow_dispatch:
+    inputs:
+      force_route:
+        description: Override triage route (auto = detect from latest commit)
+        type: choice
+        required: false
+        default: auto
+        options:
+          - auto
+          - native
+          - ota
+          - skip
 
 permissions:
   contents: write
+  actions: write
 
-# All CI runs share one queue — an OTA push will wait for a
-# running native build to finish before starting.
+# Triage is fast — always process the latest push. Release workflows
+# are dispatched independently so they are not cancelled when a newer
+# push arrives while triage is still running.
 concurrency:
   group: ci-main
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   # ── Triage: what kind of change is this? ─────────────────────
@@ -38,8 +52,15 @@ jobs:
         shell: bash
         env:
           COMMIT_MSG: ${{ github.event.head_commit.message }}
+          FORCE_ROUTE: ${{ inputs.force_route || 'auto' }}
         run: |
           set -euo pipefail
+
+          if [ "$FORCE_ROUTE" != "auto" ]; then
+            echo "route=${FORCE_ROUTE}" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual override — route=${FORCE_ROUTE}"
+            exit 0
+          fi
 
           # Skip CI commits from bots
           if echo "$COMMIT_MSG" | grep -qF '[skip ci]'; then
@@ -97,16 +118,45 @@ jobs:
             echo "**Commit:** \`${GITHUB_SHA::7}\` — ${{ github.event.head_commit.message }}"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # ── Native path: build APK + create GitHub release ───────────
-  native-release:
+  # ── Native path: dispatch APK release as an independent workflow ─
+  # Decoupled from this job so a newer push cancelling triage does
+  # not prevent an in-flight native build from starting.
+  trigger-native-release:
     needs: triage
     if: needs.triage.outputs.route == 'native'
-    uses: ./.github/workflows/android-apk-release.yml
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Android APK release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'android-apk-release.yml',
+              ref: context.sha,
+            });
+            core.notice(`Dispatched Android APK release for ${context.sha.slice(0, 7)}`);
 
-  # ── JS path: publish OTA bundle ──────────────────────────────
-  ota-publish:
+  # ── JS path: dispatch OTA publish as an independent workflow ───
+  trigger-ota-publish:
     needs: triage
     if: needs.triage.outputs.route == 'ota'
-    uses: ./.github/workflows/publish-nitro-ota.yml
-    secrets: inherit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Nitro OTA publish
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'publish-nitro-ota.yml',
+              ref: context.sha,
+              inputs: {
+                deployment_environment: 'production',
+                platform: 'android',
+                ci_auto_publish: 'true',
+              },
+            });
+            core.notice(`Dispatched Nitro OTA publish for ${context.sha.slice(0, 7)}`);

@@ -7,6 +7,7 @@ import { formatWeightFromKg } from "@/lib/weight";
 
 import type { WorkoutsScreenController } from "../hooks/use-workouts-screen-controller";
 import { formatDuration } from "../utils";
+import { RestProgressBar, type RestPhase } from "./RestProgressBar";
 import { styles } from "./SessionSummaryCard.styles";
 
 const { opacity, sizes } = designTokens;
@@ -22,22 +23,12 @@ export function SessionSummaryCard({
     return null;
   }
 
-  const overtimeFillPercent =
-    controller.activeRestTimer && controller.restOvertimeMs > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (controller.restOvertimeMs /
-              (controller.activeRestTimer.durationMs +
-                controller.restOvertimeMs)) *
-              100
-          )
-        )
-      : 0;
-  const baseFillPercent =
-    controller.restIsComplete && controller.restOvertimeMs > 0
-      ? Math.max(0, 100 - overtimeFillPercent)
-      : Math.round(controller.restProgress * 100);
+  const restPhase: RestPhase =
+    controller.restOvertimeMs > 0
+      ? "overtime"
+      : controller.restIsComplete
+      ? "ready"
+      : "counting";
 
   return (
     <View
@@ -128,37 +119,11 @@ export function SessionSummaryCard({
               ? `${controller.activeRestTimer.exerciseName}: go crush the next set.`
               : `${controller.activeRestTimer.exerciseName}: recover now.`}
           </AppText>
-          <View style={styles.restProgressRow}>
-            <View
-              style={[
-                styles.restProgressTrack,
-                { borderColor: theme.palette.border },
-              ]}
-            >
-              <View
-                style={[
-                  styles.restProgressFill,
-                  {
-                    backgroundColor: controller.restIsComplete
-                      ? theme.palette.success
-                      : theme.palette.accent,
-                    width: `${baseFillPercent}%`,
-                  },
-                ]}
-              />
-              {controller.restOvertimeMs > 0 ? (
-                <View
-                  style={[
-                    styles.restProgressOvertimeFill,
-                    {
-                      backgroundColor: theme.palette.danger,
-                      width: `${overtimeFillPercent}%`,
-                    },
-                  ]}
-                />
-              ) : null}
-            </View>
-          </View>
+          <RestProgressBar
+            theme={theme}
+            restTimer={controller.activeRestTimer}
+            phase={restPhase}
+          />
         </View>
       ) : null}
 

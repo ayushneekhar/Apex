@@ -83,8 +83,10 @@ export const designTokens = {
   },
   grid: {
     defaultLineGap: 48,
-    maxVerticalLines: 36,
-    maxHorizontalLines: 64,
+    /** Max grid travel (px) at full device tilt. */
+    parallaxGridShift: 14,
+    /** Max accent-glow travel (px) at full device tilt, opposite the grid. */
+    parallaxGlowShift: 42,
   },
   overlay: {
     modalBackdrop: 'rgba(0, 0, 0, 0.58)',

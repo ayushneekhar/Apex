@@ -4,7 +4,8 @@ import { designTokens } from '@/constants/design-system';
 
 const { border, layout, radii, sizes, spacing } = designTokens;
 const CALENDAR_COLUMN_WIDTH = '14.285714%';
-const CALENDAR_DAY_SIZE = 34;
+export const CALENDAR_DAY_SIZE = 34;
+export const CALENDAR_DAY_BORDER_WIDTH = 1.5;
 
 export const styles = StyleSheet.create({
   screen: {
@@ -56,6 +57,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  calendarGrid: {
+    gap: spacing.xs,
+  },
   calendarRow: {
     flexDirection: 'row',
   },
@@ -69,9 +73,31 @@ export const styles = StyleSheet.create({
     width: CALENDAR_DAY_SIZE,
     height: CALENDAR_DAY_SIZE,
     borderRadius: radii.pill,
-    borderWidth: 1.5,
+    borderWidth: CALENDAR_DAY_BORDER_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  calendarLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.lg,
+    marginTop: spacing.xs,
+  },
+  calendarLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  calendarLegendSwatch: {
+    width: 10,
+    height: 10,
+    borderRadius: radii.pill,
+  },
+  calendarLegendStreak: {
+    width: 14,
+    height: 2,
+    borderRadius: radii.pill,
   },
   calendarDayLabel: {
     fontSize: 12,

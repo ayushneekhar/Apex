@@ -19,12 +19,23 @@ import { useAppStore } from '@/store/use-app-store';
 import type { RootStackParamList } from '@/types/navigation';
 import type { WorkoutSession } from '@/types/workout';
 
+import {
+  CalendarHeatLayer,
+  getHeatFillAlpha,
+  heatFillNeedsInverseText,
+  type CalendarHeatCell,
+} from './history/components/CalendarHeatLayer';
 import { formatDuration } from './workouts/utils';
-import { styles } from './HistoryScreen.styles';
+import {
+  CALENDAR_DAY_BORDER_WIDTH,
+  CALENDAR_DAY_SIZE,
+  styles,
+} from './HistoryScreen.styles';
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 const DAYS_PER_WEEK = WEEKDAY_LABELS.length;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const HEAT_LEGEND_STEPS = [0, 0.35, 0.7, 1] as const;
 
 type SessionRowData = {
   workoutId: string;
@@ -35,6 +46,7 @@ type SessionRowData = {
   monthKey: string;
   exercisePreview: string;
   setCount: number;
+  volumeKg: number;
   durationLabel: string | null;
   volumeLabel: string;
 };
@@ -45,13 +57,18 @@ type SessionSection = {
   rows: SessionRowData[];
 };
 
-type CalendarCell = {
-  key: string;
+type CalendarCell = CalendarHeatCell & {
   dateKey: string;
   dayNumber: number;
   inCurrentMonth: boolean;
-  isWorkoutDay: boolean;
   isToday: boolean;
+};
+
+type WeekRuns = {
+  /** Week start timestamp → index of the run of consecutive trained weeks it belongs to. */
+  runByWeek: Map<number, number>;
+  runLengths: number[];
+  activeRunId: number | null;
 };
 
 function toLocalDateKey(timestamp: number): string {
@@ -88,7 +105,8 @@ function shiftCalendarMonth(monthStartTimestamp: number, deltaMonths: number): n
 
 function buildCalendarWeeks(
   monthStartTimestamp: number,
-  workoutDayKeys: Set<string>,
+  dayIntensities: Map<string, number>,
+  weekRuns: WeekRuns,
   todayKey: string
 ): CalendarCell[][] {
   const firstDay = new Date(monthStartTimestamp);
@@ -103,13 +121,22 @@ function buildCalendarWeeks(
     const date = new Date(year, monthIndex, cellIndex - leadingDays + 1);
     const dateKey = toLocalDateKey(date.getTime());
     const inCurrentMonth = date.getMonth() === monthIndex;
+    const isWorkoutDay = inCurrentMonth && dayIntensities.has(dateKey);
+    const runId = isWorkoutDay
+      ? weekRuns.runByWeek.get(getWeekStartTimestamp(date.getTime())) ?? null
+      : null;
+    // A single trained week isn't a streak worth drawing.
+    const streakRunId = runId !== null && weekRuns.runLengths[runId] > 1 ? runId : null;
 
     return {
       key: `${dateKey}-${cellIndex}`,
       dateKey,
       dayNumber: date.getDate(),
       inCurrentMonth,
-      isWorkoutDay: inCurrentMonth && workoutDayKeys.has(dateKey),
+      isWorkoutDay,
+      intensity: dayIntensities.get(dateKey) ?? 0,
+      streakRunId,
+      isActiveStreak: streakRunId !== null && streakRunId === weekRuns.activeRunId,
       isToday: dateKey === todayKey,
     };
   });
@@ -122,23 +149,68 @@ function buildCalendarWeeks(
   return weeks;
 }
 
-/** Consecutive weeks (Sun–Sat) with at least one session, counting back from this week. */
-function getWeekStreak(performedAts: number[], now: number): number {
-  const trainedWeeks = new Set(performedAts.map(getWeekStartTimestamp));
-  let cursor = getWeekStartTimestamp(now);
+/**
+ * Groups trained weeks (Sun–Sat) into runs of consecutive weeks. The active run
+ * is the one containing this week, or last week — an empty current week doesn't
+ * break the streak until it's over.
+ */
+function getWeekRuns(performedAts: number[], now: number): WeekRuns {
+  const weeks = [...new Set(performedAts.map(getWeekStartTimestamp))].sort((a, b) => a - b);
+  const runByWeek = new Map<number, number>();
+  const runLengths: number[] = [];
 
-  // An empty current week doesn't break the streak until it's over.
-  if (!trainedWeeks.has(cursor)) {
-    cursor = getWeekStartTimestamp(cursor - MS_PER_DAY);
-  }
+  weeks.forEach((week, index) => {
+    // Step via a mid-week day so DST shifts don't break the comparison.
+    const continuesRun =
+      index > 0 && getWeekStartTimestamp(weeks[index - 1] + 8 * MS_PER_DAY) === week;
 
-  let streak = 0;
-  while (trainedWeeks.has(cursor)) {
-    streak += 1;
-    cursor = getWeekStartTimestamp(cursor - MS_PER_DAY);
-  }
+    if (!continuesRun) {
+      runLengths.push(0);
+    }
 
-  return streak;
+    runLengths[runLengths.length - 1] += 1;
+    runByWeek.set(week, runLengths.length - 1);
+  });
+
+  const thisWeek = getWeekStartTimestamp(now);
+  const lastWeek = getWeekStartTimestamp(thisWeek - MS_PER_DAY);
+  const activeRunId = runByWeek.get(thisWeek) ?? runByWeek.get(lastWeek) ?? null;
+
+  return { runByWeek, runLengths, activeRunId };
+}
+
+/**
+ * Per-day training load in [0, 1] relative to the heaviest day on record. Uses
+ * whichever of volume or set count is higher so bodyweight days still register;
+ * the square root keeps ordinary days from washing out next to one huge session.
+ */
+function getDayIntensities(rows: SessionRowData[]): Map<string, number> {
+  const totals = new Map<string, { volumeKg: number; setCount: number }>();
+
+  rows.forEach((row) => {
+    const total = totals.get(row.dayKey) ?? { volumeKg: 0, setCount: 0 };
+    total.volumeKg += row.volumeKg;
+    total.setCount += row.setCount;
+    totals.set(row.dayKey, total);
+  });
+
+  let maxVolumeKg = 0;
+  let maxSetCount = 0;
+  totals.forEach((total) => {
+    maxVolumeKg = Math.max(maxVolumeKg, total.volumeKg);
+    maxSetCount = Math.max(maxSetCount, total.setCount);
+  });
+
+  const intensities = new Map<string, number>();
+  totals.forEach((total, dayKey) => {
+    const load = Math.max(
+      maxVolumeKg > 0 ? total.volumeKg / maxVolumeKg : 0,
+      maxSetCount > 0 ? total.setCount / maxSetCount : 0
+    );
+    intensities.set(dayKey, Math.sqrt(load));
+  });
+
+  return intensities;
 }
 
 function getExercisePreview(session: WorkoutSession): string {
@@ -158,6 +230,8 @@ function buildSessionRow(
   session: WorkoutSession,
   weightUnit: WeightUnit
 ): SessionRowData {
+  const volumeKg = getWorkoutSessionVolumeKg(session);
+
   return {
     workoutId,
     sessionId: session.id,
@@ -167,8 +241,9 @@ function buildSessionRow(
     monthKey: toLocalMonthKey(session.performedAt),
     exercisePreview: getExercisePreview(session),
     setCount: session.sets.length,
+    volumeKg,
     durationLabel: session.durationMs === null ? null : formatDuration(session.durationMs),
-    volumeLabel: formatWeightFromKg(getWorkoutSessionVolumeKg(session), weightUnit),
+    volumeLabel: formatWeightFromKg(volumeKg, weightUnit),
   };
 }
 
@@ -270,7 +345,7 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { layout, opacity } = designTokens;
+  const { layout, opacity, spacing } = designTokens;
 
   const workouts = useAppStore((state) => state.workouts);
   const weightUnit = useAppStore((state) => state.settings.weightUnit);
@@ -278,6 +353,7 @@ export default function HistoryScreen() {
     getMonthStartTimestamp(Date.now())
   );
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [calendarGridWidth, setCalendarGridWidth] = useState(0);
 
   const rows = useMemo(() => {
     const allRows: SessionRowData[] = [];
@@ -292,16 +368,21 @@ export default function HistoryScreen() {
   }, [weightUnit, workouts]);
 
   const todayKey = toLocalDateKey(Date.now());
-  const workoutDayKeys = useMemo(() => new Set(rows.map((row) => row.dayKey)), [rows]);
-  const weekStreak = useMemo(
-    () => getWeekStreak(rows.map((row) => row.performedAt), Date.now()),
+  const dayIntensities = useMemo(() => getDayIntensities(rows), [rows]);
+  const weekRuns = useMemo(
+    () => getWeekRuns(rows.map((row) => row.performedAt), Date.now()),
     [rows]
   );
+  const weekStreak =
+    weekRuns.activeRunId === null ? 0 : weekRuns.runLengths[weekRuns.activeRunId];
 
   const currentMonthKey = toLocalMonthKey(Date.now());
   const calendarWeeks = useMemo(
-    () => buildCalendarWeeks(calendarMonthStartTimestamp, workoutDayKeys, todayKey),
-    [calendarMonthStartTimestamp, todayKey, workoutDayKeys]
+    () => buildCalendarWeeks(calendarMonthStartTimestamp, dayIntensities, weekRuns, todayKey),
+    [calendarMonthStartTimestamp, dayIntensities, todayKey, weekRuns]
+  );
+  const monthHasStreakLinks = calendarWeeks.some((week) =>
+    week.some((cell) => cell.streakRunId !== null)
   );
   const sessionsThisMonth = useMemo(
     () => rows.filter((row) => row.monthKey === currentMonthKey).length,
@@ -448,53 +529,105 @@ export default function HistoryScreen() {
             ))}
           </View>
 
-          {calendarWeeks.map((week) => (
-            <View key={week[0].key} style={styles.calendarRow}>
-              {week.map((cell) => {
-                if (!cell.inCurrentMonth) {
-                  return <View key={cell.key} style={styles.calendarCell} />;
-                }
+          <View
+            style={styles.calendarGrid}
+            onLayout={(event) => setCalendarGridWidth(event.nativeEvent.layout.width)}
+          >
+            <CalendarHeatLayer
+              weeks={calendarWeeks}
+              width={calendarGridWidth}
+              rowHeight={CALENDAR_DAY_SIZE}
+              rowGap={spacing.xs}
+              dayRadius={CALENDAR_DAY_SIZE / 2 - CALENDAR_DAY_BORDER_WIDTH}
+              theme={theme}
+              animationKey={calendarMonthStartTimestamp}
+            />
+            {calendarWeeks.map((week) => (
+              <View key={week[0].key} style={styles.calendarRow}>
+                {week.map((cell) => {
+                  if (!cell.inCurrentMonth) {
+                    return <View key={cell.key} style={styles.calendarCell} />;
+                  }
 
-                const isSelected = cell.dateKey === selectedDayKey;
+                  const isSelected = cell.dateKey === selectedDayKey;
 
-                return (
-                  <View key={cell.key} style={styles.calendarCell}>
-                    <Pressable
-                      disabled={!cell.isWorkoutDay}
-                      onPress={() => {
-                        setSelectedDayKey((current) =>
-                          current === cell.dateKey ? null : cell.dateKey
-                        );
-                      }}
-                      style={[
-                        styles.calendarDay,
-                        {
-                          borderColor: isSelected
-                            ? theme.palette.textPrimary
-                            : cell.isToday
-                              ? theme.palette.accent
-                              : 'transparent',
-                          backgroundColor: cell.isWorkoutDay
-                            ? theme.palette.accent
-                            : 'transparent',
-                        },
-                      ]}
-                    >
-                      <AppText
-                        tone={cell.isWorkoutDay ? 'inverse' : 'muted'}
+                  return (
+                    <View key={cell.key} style={styles.calendarCell}>
+                      <Pressable
+                        disabled={!cell.isWorkoutDay}
+                        onPress={() => {
+                          setSelectedDayKey((current) =>
+                            current === cell.dateKey ? null : cell.dateKey
+                          );
+                        }}
                         style={[
-                          styles.calendarDayLabel,
-                          (cell.isWorkoutDay || cell.isToday) && styles.calendarDayLabelStrong,
+                          styles.calendarDay,
+                          {
+                            borderColor: isSelected
+                              ? theme.palette.textPrimary
+                              : cell.isToday
+                                ? theme.palette.accent
+                                : 'transparent',
+                          },
                         ]}
                       >
-                        {cell.dayNumber}
-                      </AppText>
-                    </Pressable>
-                  </View>
-                );
-              })}
+                        <AppText
+                          tone={
+                            cell.isWorkoutDay
+                              ? heatFillNeedsInverseText(cell.intensity)
+                                ? 'inverse'
+                                : 'primary'
+                              : 'muted'
+                          }
+                          style={[
+                            styles.calendarDayLabel,
+                            (cell.isWorkoutDay || cell.isToday) && styles.calendarDayLabelStrong,
+                          ]}
+                        >
+                          {cell.dayNumber}
+                        </AppText>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+
+          {rows.length > 0 ? (
+            <View style={styles.calendarLegend}>
+              {monthHasStreakLinks ? (
+                <View style={styles.calendarLegendItem}>
+                  <View
+                    style={[styles.calendarLegendStreak, { backgroundColor: theme.palette.accent }]}
+                  />
+                  <AppText variant="micro" tone="muted">
+                    Streak
+                  </AppText>
+                </View>
+              ) : null}
+              <View style={styles.calendarLegendItem}>
+                <AppText variant="micro" tone="muted">
+                  Light
+                </AppText>
+                {HEAT_LEGEND_STEPS.map((intensity) => (
+                  <View
+                    key={intensity}
+                    style={[
+                      styles.calendarLegendSwatch,
+                      {
+                        backgroundColor: theme.palette.accent,
+                        opacity: getHeatFillAlpha(intensity),
+                      },
+                    ]}
+                  />
+                ))}
+                <AppText variant="micro" tone="muted">
+                  Heavy
+                </AppText>
+              </View>
             </View>
-          ))}
+          ) : null}
         </View>
 
         {selectedDayLabel ? (

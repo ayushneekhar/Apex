@@ -5,22 +5,12 @@ import { designTokens } from '@/constants/design-system';
 const { grid, opacity } = designTokens;
 
 export const NEON_GRID_DEFAULT_LINE_GAP = grid.defaultLineGap;
-export const NEON_GRID_MAX_VERTICAL_LINES = grid.maxVerticalLines;
-export const NEON_GRID_MAX_HORIZONTAL_LINES = grid.maxHorizontalLines;
+export const NEON_GRID_PARALLAX_GRID_SHIFT = grid.parallaxGridShift;
+export const NEON_GRID_PARALLAX_GLOW_SHIFT = grid.parallaxGlowShift;
+export const NEON_GRID_WASH_OPACITY = opacity.neonWash;
 
 export const styles = StyleSheet.create({
-  neonWash: {
+  canvas: {
     ...StyleSheet.absoluteFillObject,
-    opacity: opacity.neonWash,
-  },
-  verticalLine: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-  },
-  horizontalLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
   },
 });

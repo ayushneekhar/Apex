@@ -38,26 +38,6 @@ export const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: spacing.sm,
   },
-  restProgressRow: {
-    width: "100%",
-  },
-  restProgressTrack: {
-    width: "100%",
-    height: spacing.sm,
-    borderWidth: border.thin,
-    borderRadius: radii.pill,
-    overflow: "hidden",
-  },
-  restProgressFill: {
-    height: "100%",
-    borderRadius: radii.pill,
-  },
-  restProgressOvertimeFill: {
-    position: "absolute",
-    right: 0,
-    top: 0,
-    height: "100%",
-  },
   sessionStatsRow: {
     flexDirection: "row",
     gap: spacing.sm,

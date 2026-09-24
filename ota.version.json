@@ -1,10 +1,10 @@
 {
-  "version": "9",
+  "version": "10",
   "isSemver": false,
   "targetVersions": {
     "android": [
       "1.1.1+9"
     ]
   },
-  "releaseNotes": "Native release v1.1.1+9"
+  "releaseNotes": "Auto OTA from main (68bea73)"
 }

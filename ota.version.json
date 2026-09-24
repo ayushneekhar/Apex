@@ -1,10 +1,10 @@
 {
-  "version": "7",
+  "version": "9",
   "isSemver": false,
   "targetVersions": {
     "android": [
-      "1.1.1+7"
+      "1.1.1+9"
     ]
   },
-  "releaseNotes": "Native release v1.1.1+7"
+  "releaseNotes": "Native release v1.1.1+9"
 }

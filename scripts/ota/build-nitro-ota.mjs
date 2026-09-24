@@ -67,11 +67,23 @@ if (!otaVersion || otaVersion.trim().length === 0) {
 const projectRoot = process.cwd();
 const appConfigPath = resolve(projectRoot, "app.json");
 const appConfig = readJson(appConfigPath);
+// Target the exact binary ("<version>+<build>") so a bundle built for one native
+// build is never applied to another. Must match getBinaryTargetVersion() in lib/nitro-ota.ts.
+function resolveBinaryTargetVersion() {
+  const version = String(appConfig?.expo?.version ?? "1.0.0");
+  const build =
+    platform === "android"
+      ? appConfig?.expo?.android?.versionCode
+      : appConfig?.expo?.ios?.buildNumber;
+  const trimmedBuild = build === undefined || build === null ? "" : String(build).trim();
+  return trimmedBuild ? `${version}+${trimmedBuild}` : version;
+}
+
 const appVersion =
   typeof args["target-app-version"] === "string" &&
   args["target-app-version"].trim().length > 0
     ? args["target-app-version"].trim()
-    : String(appConfig?.expo?.version ?? "1.0.0");
+    : resolveBinaryTargetVersion();
 
 const outputDir = resolve(
   projectRoot,
@@ -107,7 +119,8 @@ console.log(`Building Nitro OTA bundle (${platform})...`);
 const bundleResult = spawnSync(process.execPath, expoArgs, {
   cwd: projectRoot,
   stdio: "inherit",
-  env: process.env,
+  // Inlined into the bundle so the app knows which OTA version its JS is.
+  env: { ...process.env, EXPO_PUBLIC_BUNDLED_OTA_VERSION: otaVersion.trim() },
 });
 
 if (bundleResult.status !== 0) {

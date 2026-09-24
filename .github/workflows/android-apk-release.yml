@@ -106,6 +106,44 @@ jobs:
             exit 1
           fi
 
+      # ── Bump build counters ─────────────────────────────────
+      # Every native build gets a fresh versionCode (so OTAs built for older
+      # binaries stop targeting it) and a fresh OTA version (embedded in the
+      # APK's JS and published as the matching OTA below).
+      - name: Bump versionCode and OTA bundle version
+        id: counters
+        shell: bash
+        env:
+          DEPLOYMENT_ENVIRONMENT: ${{ inputs.build_environment || 'production' }}
+        run: |
+          set -euo pipefail
+
+          COUNTER_FILE="scripts/ota/ota-bundle-version.json"
+
+          read -r VERSION_CODE OTA_VERSION < <(node -e "
+            const fs = require('fs');
+            const app = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+            app.expo.android.versionCode = Number(app.expo.android.versionCode || 0) + 1;
+            fs.writeFileSync('app.json', JSON.stringify(app, null, 2) + '\\n');
+
+            const counters = JSON.parse(fs.readFileSync('${COUNTER_FILE}', 'utf8'));
+            counters['${DEPLOYMENT_ENVIRONMENT}'] = Number(counters['${DEPLOYMENT_ENVIRONMENT}'] || 0) + 1;
+            fs.writeFileSync('${COUNTER_FILE}', JSON.stringify(counters, null, 2) + '\\n');
+
+            console.log(app.expo.android.versionCode, counters['${DEPLOYMENT_ENVIRONMENT}']);
+          ")
+
+          echo "versionCode → ${VERSION_CODE}, ${DEPLOYMENT_ENVIRONMENT} OTA version → ${OTA_VERSION}"
+          echo "ota_version=${OTA_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "EXPO_PUBLIC_BUNDLED_OTA_VERSION=${OTA_VERSION}" >> "$GITHUB_ENV"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.json "${COUNTER_FILE}"
+          git commit -m "chore(release): bump android versionCode to ${VERSION_CODE}, ${DEPLOYMENT_ENVIRONMENT} OTA to ${OTA_VERSION} [skip ci]"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
       # ── Resolve version & tag ────────────────────────────────
       - name: Read app version
         id: version
@@ -235,6 +273,26 @@ jobs:
             --title "Apex ${{ steps.version.outputs.app_version }} (${{ steps.version.outputs.build_type }})" \
             --notes-file release_notes.md \
             --latest
+
+      # ── Publish matching OTA ──────────────────────────────────
+      # Keeps the OTA branch in sync with this binary so the app doesn't pull
+      # an older bundle over the JS it shipped with.
+      - name: Build matching Nitro OTA bundle
+        shell: bash
+        env:
+          OTA_VERSION: ${{ steps.counters.outputs.ota_version }}
+        run: |
+          set -euo pipefail
+          yarn nitro-ota:build --platform android --ota-version "${OTA_VERSION}" \
+            --release-notes "Native release ${{ steps.version.outputs.tag }}"
+
+      - name: Publish matching Nitro OTA bundle
+        shell: bash
+        env:
+          OTA_BRANCH: nitro-ota-android-${{ inputs.build_environment || 'production' }}
+          OTA_PLATFORM: android
+          OTA_VERSION: ${{ steps.counters.outputs.ota_version }}
+        run: bash scripts/ota/publish-ota-branch.sh
 
       # ── Notification ──────────────────────────────────────────
       - name: Post ntfy notification

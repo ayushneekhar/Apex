@@ -91,6 +91,48 @@ export function getBinaryAppVersion(): string {
   return version ?? "1.0.0";
 }
 
+function getBinaryBuildNumber(): string | null {
+  const platform = getNativePlatform();
+  if (platform === "android") {
+    const versionCode = Constants.expoConfig?.android?.versionCode;
+    return typeof versionCode === "number" ? String(versionCode) : null;
+  }
+
+  if (platform === "ios") {
+    return toTrimmedString(Constants.expoConfig?.ios?.buildNumber);
+  }
+
+  return null;
+}
+
+/**
+ * Identifies the exact native binary ("<version>+<build>"). OTA manifests
+ * target this string so a bundle is only offered to the binary it was built for.
+ * Must stay in sync with scripts/ota/build-nitro-ota.mjs.
+ */
+export function getBinaryTargetVersion(): string {
+  const version = getBinaryAppVersion();
+  const build = getBinaryBuildNumber();
+  return build ? `${version}+${build}` : version;
+}
+
+/**
+ * OTA version the running JS was built as. Inlined at bundle time, so when the
+ * binary's embedded bundle is running (no OTA applied yet) this tells us how
+ * new that embedded JS is.
+ */
+function getBundledOtaVersion(): string | null {
+  return toTrimmedString(process.env.EXPO_PUBLIC_BUNDLED_OTA_VERSION);
+}
+
+function toOtaVersionNumber(value: string | null | undefined): number | null {
+  if (!value || !/^\d+$/.test(value.trim())) {
+    return null;
+  }
+
+  return Number(value.trim());
+}
+
 function getRuntimeConfig() {
   const platform = getNativePlatform();
 
@@ -259,7 +301,7 @@ export function getNitroOtaSnapshot(): NitroOtaSnapshot {
     versionPath: config.versionPath,
     versionUrl: context.urls.versionUrl,
     downloadUrl: context.urls.downloadUrl,
-    currentOtaVersion: context.manager.getVersion(),
+    currentOtaVersion: context.manager.getVersion() ?? getBundledOtaVersion(),
     currentBundlePath: context.manager.getUnzippedPath(),
   };
 }
@@ -270,20 +312,30 @@ export async function checkNitroOtaForUpdates(): Promise<NitroOtaUpdateCheck | n
     return null;
   }
 
-  const result = await context.manager.checkForUpdatesJS(getBinaryAppVersion());
+  const result = await context.manager.checkForUpdatesJS(getBinaryTargetVersion());
 
   if (!result) {
     return null;
   }
+
+  const currentVersion = context.manager.getVersion() ?? getBundledOtaVersion();
 
   if (isNotFoundResponse(result.remoteVersion)) {
     return {
       ...result,
       hasUpdate: false,
       isCompatible: false,
-      remoteVersion:
-        context.manager.getVersion() ?? getBinaryAppVersion(),
+      remoteVersion: currentVersion ?? getBinaryAppVersion(),
     };
+  }
+
+  // Nitro treats "no OTA applied yet" as always outdated and otherwise flags any
+  // differing version string. Only offer bundles strictly newer than what is
+  // running, including the JS embedded in the binary.
+  const remote = toOtaVersionNumber(result.remoteVersion);
+  const current = toOtaVersionNumber(currentVersion);
+  if (remote !== null && current !== null) {
+    return { ...result, hasUpdate: remote > current };
   }
 
   return result;

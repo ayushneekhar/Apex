@@ -1,12 +1,11 @@
 import "react-native-reanimated";
 
-import {
-  Unbounded_400Regular,
-  Unbounded_500Medium,
-  Unbounded_700Bold,
-  useFonts,
-} from "@expo-google-fonts/unbounded";
-import { Ionicons } from "@expo/vector-icons";
+// Deep imports: the package barrels pull every font weight / icon set into the
+// bundle's assets, which ships ~7MB of unused fonts with every OTA update.
+import { Unbounded_400Regular } from "@expo-google-fonts/unbounded/400Regular";
+import { Unbounded_500Medium } from "@expo-google-fonts/unbounded/500Medium";
+import { Unbounded_700Bold } from "@expo-google-fonts/unbounded/700Bold";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import {
   DarkTheme,
@@ -14,6 +13,7 @@ import {
   type Theme,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";

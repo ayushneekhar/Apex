@@ -61,16 +61,16 @@ export function createTabScreenOptions(
       paddingBottom: Math.max(insets.bottom, spacing.xs),
     },
     tabBarBackground: () => (
-      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <BlurView
           tint={theme.statusBarStyle === "light" ? "dark" : "light"}
           intensity={40}
           experimentalBlurMethod="dimezisBlurView"
-          style={StyleSheet.absoluteFillObject}
+          style={StyleSheet.absoluteFill}
         />
         <View
           style={[
-            StyleSheet.absoluteFillObject,
+            StyleSheet.absoluteFill,
             {
               backgroundColor: `${theme.palette.panel}33`,
             },

@@ -11,6 +11,6 @@ export const NEON_GRID_WASH_OPACITY = opacity.neonWash;
 
 export const styles = StyleSheet.create({
   canvas: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
 });

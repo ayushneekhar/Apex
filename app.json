@@ -48,7 +48,11 @@
       "expo-sqlite",
       "expo-notifications",
       "expo-secure-store",
-      "react-native-nitro-ota"
+      "react-native-nitro-ota",
+      "expo-font",
+      "expo-image",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "extra": {
       "nitroOta": {

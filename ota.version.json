@@ -1,10 +1,10 @@
 {
-  "version": "6",
+  "version": "10",
   "isSemver": false,
   "targetVersions": {
     "ios": [
-      "1.1.1"
+      "1.1.1+4"
     ]
   },
-  "releaseNotes": "Auto OTA from main (85e55a2)"
+  "releaseNotes": "Auto OTA from main (68bea73)"
 }

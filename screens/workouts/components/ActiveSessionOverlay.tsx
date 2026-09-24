@@ -46,6 +46,7 @@ export function ActiveSessionOverlay({
       <NeonGridBackground />
 
       <ScrollView
+        scrollEnabled={!controller.isScrubbingSetReps}
         bounces={false}
         alwaysBounceVertical={false}
         overScrollMode="never"
@@ -89,7 +90,7 @@ export function ActiveSessionOverlay({
           >
             <AppText variant="heading">{activeSession.workoutName}</AppText>
             <AppText tone="muted">
-              Tap top of a set to mark complete or decrement reps. Press and hold the set to edit reps. Tap bottom strip to edit weight. Use Edit on an exercise to change the exercise, sets, and targets.
+              Tap top of a set to mark complete or decrement reps. Press and hold, then drag up or down to adjust reps, or release without dragging to type them. Tap bottom strip to edit weight. Use Edit on an exercise to change the exercise, sets, and targets.
             </AppText>
           </Animated.View>
         </Animated.View>

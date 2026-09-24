@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { EXERCISE_LIBRARY } from "@/constants/exercise-library";
 
@@ -174,7 +174,7 @@ export function useWorkoutSessionSetActionsController({
   const [isDiscardSessionModalOpen, setIsDiscardSessionModalOpen] =
     useState(false);
 
-  const setBoxLongPressRef = useRef(false);
+  const [isScrubbingSetReps, setIsScrubbingSetReps] = useState(false);
 
   const customSetEntry = useMemo(
     () =>
@@ -434,6 +434,48 @@ export function useWorkoutSessionSetActionsController({
     openCustomSetModal(setEntry, "reps");
   }
 
+  function handleSetRepScrubStart() {
+    triggerLongPressHaptic();
+    setIsScrubbingSetReps(true);
+  }
+
+  function handleSetRepScrubCancel() {
+    setIsScrubbingSetReps(false);
+  }
+
+  async function handleSetRepScrubCommit(
+    setEntry: ActiveWorkoutSet,
+    reps: number
+  ) {
+    setIsScrubbingSetReps(false);
+
+    if (reps === setEntry.actualReps) {
+      return;
+    }
+
+    try {
+      // Completing a pending set goes through the tap path first so it
+      // advances the current exercise and starts rest exactly like a tap.
+      if (setEntry.actualReps === 0 && reps > 0) {
+        const result = await decrementOrCompleteSessionSet(setEntry.id);
+
+        if (result.shouldStartRest && result.restSet) {
+          triggerSuccessHaptic();
+        }
+
+        if (reps === setEntry.targetReps) {
+          setSessionActionError(null);
+          return;
+        }
+      }
+
+      await setSessionSetCustomValues(setEntry.id, reps, setEntry.actualWeightKg);
+      setSessionActionError(null);
+    } catch {
+      setSessionActionError("Could not update this set right now.");
+    }
+  }
+
   function openDiscardSessionModal() {
     setSessionActionError(null);
     setIsDiscardSessionModalOpen(true);
@@ -480,7 +522,10 @@ export function useWorkoutSessionSetActionsController({
     handleSetPress,
     handleSetWeightPress,
     handleSetLongPress,
-    setBoxLongPressRef,
+    isScrubbingSetReps,
+    handleSetRepScrubStart,
+    handleSetRepScrubCancel,
+    handleSetRepScrubCommit,
 
     customSetId,
     customSetEditMode,

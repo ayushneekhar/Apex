@@ -1,49 +1,27 @@
-import { Platform } from "react-native";
 import { Haptics } from "react-native-nitro-haptics";
 
-type AndroidHapticType = Parameters<typeof Haptics.performAndroidHaptics>[0];
-
-function runHaptic({
-  ios,
-  android,
-}: {
-  ios: () => void;
-  android: AndroidHapticType;
-}) {
-  if (Platform.OS === "android") {
-    Haptics.performAndroidHaptics(android);
-    return;
-  }
-
-  if (Platform.OS === "ios") {
-    ios();
-  }
-}
+// Note: Haptics.performAndroidHaptics is intentionally unused. Its native
+// implementation calls performHapticFeedback on a freshly constructed View that
+// is never attached to a window, which Android silently ignores, so it never
+// produces feedback. impact/notification/selection drive the Vibrator service
+// directly and work on both platforms.
 
 export function triggerSelectionHaptic() {
-  runHaptic({
-    ios: () => Haptics.selection(),
-    android: "segment-tick",
-  });
+  Haptics.selection();
 }
 
 export function triggerSuccessHaptic() {
-  runHaptic({
-    ios: () => Haptics.notification("success"),
-    android: "confirm",
-  });
+  Haptics.notification("success");
 }
 
 export function triggerLightImpactHaptic() {
-  runHaptic({
-    ios: () => Haptics.impact("rigid"),
-    android: "context-click",
-  });
+  Haptics.impact("rigid");
+}
+
+export function triggerMediumImpactHaptic() {
+  Haptics.impact("medium");
 }
 
 export function triggerLongPressHaptic() {
-  runHaptic({
-    ios: () => Haptics.impact("medium"),
-    android: "long-press",
-  });
+  Haptics.impact("medium");
 }

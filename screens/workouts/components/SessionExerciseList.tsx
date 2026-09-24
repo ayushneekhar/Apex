@@ -8,7 +8,7 @@ import { formatWeightFromKg, isAssistedWeightKg } from '@/lib/weight';
 
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
 import { formatDuration } from '../utils';
-import { SetRepMeter } from './SetRepMeter';
+import { SessionSetRepControl } from './SessionSetRepControl';
 import { styles } from './SessionExerciseList.styles';
 
 const { opacity } = designTokens;
@@ -156,36 +156,11 @@ export function SessionExerciseList({
                       },
                     ]}
                   >
-                    <Pressable
-                      delayLongPress={260}
-                      onPressIn={() => {
-                        controller.setBoxLongPressRef.current = false;
-                      }}
-                      onLongPress={() => {
-                        controller.setBoxLongPressRef.current = true;
-                        controller.handleSetLongPress(setEntry);
-                      }}
-                      onPress={() => {
-                        if (controller.setBoxLongPressRef.current) {
-                          controller.setBoxLongPressRef.current = false;
-                          return;
-                        }
-
-                        void controller.handleSetPress(setEntry);
-                      }}
-                      style={({ pressed }) => [
-                        styles.setBoxMain,
-                        { opacity: pressed ? opacity.pressedSoft : 1 },
-                      ]}
-                    >
-                      <SetRepMeter
-                        theme={theme}
-                        setNumber={setEntry.setNumber}
-                        actualReps={setEntry.actualReps}
-                        targetReps={setEntry.targetReps}
-                        previousReps={setEntry.previousReps}
-                      />
-                    </Pressable>
+                    <SessionSetRepControl
+                      controller={controller}
+                      theme={theme}
+                      setEntry={setEntry}
+                    />
 
                     <Pressable
                       onPress={() => {

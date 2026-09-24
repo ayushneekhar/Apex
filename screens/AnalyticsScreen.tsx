@@ -1,177 +1,37 @@
-import { useMemo } from 'react';
-import { ScrollView, View } from 'react-native';
-import { type lineDataItem, LineChart } from 'react-native-gifted-charts';
+import { useMemo, useRef, useState } from 'react';
+import { View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonGridBackground } from '@/components/ui/neon-grid-background';
 import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { formatWeightFromKg } from '@/lib/weight';
 import { useAppStore } from '@/store/use-app-store';
+import {
+  type ExerciseHistory,
+  type MetricId,
+  RANGE_OPTIONS,
+  type RangeId,
+  buildBodyweightSeries,
+  buildExerciseHistories,
+  formatMetricValue,
+  getMetricSeries,
+  getRangeStart,
+} from './analytics/analytics-data';
+import { BodyweightCard } from './analytics/components/BodyweightCard';
+import { ExerciseList } from './analytics/components/ExerciseList';
+import { ExerciseProgressCard } from './analytics/components/ExerciseProgressCard';
+import { SegmentedControl } from './analytics/components/SegmentedControl';
 import { styles } from './AnalyticsScreen.styles';
 
-type SessionSummary = {
-  workoutName: string;
-  performedAt: number;
-  bodyweightKg: number | null;
-  sets: {
-    exerciseName: string;
-    reps: number;
-    weightKg: number;
-  }[];
+const RANGE_LABELS: Record<RangeId, string> = {
+  '1M': 'The last month',
+  '3M': 'The last 3 months',
+  '6M': 'The last 6 months',
+  '1Y': 'The last year',
+  ALL: 'All time',
 };
-
-type MetricPoint = {
-  label: string;
-  valueKg: number;
-};
-
-function toPercentChange(start: number, end: number, sampleCount: number): string {
-  if (sampleCount < 2) {
-    return 'N/A';
-  }
-
-  if (start <= 0) {
-    return 'N/A';
-  }
-
-  const delta = ((end - start) / Math.abs(start)) * 100;
-  const roundedDelta = Number(delta.toFixed(1));
-
-  if (Math.abs(roundedDelta) === 0) {
-    return 'No change';
-  }
-
-  const sign = roundedDelta > 0 ? '+' : '';
-  return `${sign}${roundedDelta.toFixed(1)}%`;
-}
-
-function MetricLineChart({
-  points,
-  lineColor,
-  fillEndColor,
-  axisColor,
-  mutedColor,
-}: {
-  points: MetricPoint[];
-  lineColor: string;
-  fillEndColor: string;
-  axisColor: string;
-  mutedColor: string;
-}) {
-  if (points.length === 0) {
-    return (
-      <View style={styles.chartEmpty}>
-        <AppText tone="muted">Not enough logged data yet.</AppText>
-      </View>
-    );
-  }
-
-  if (points.length === 1) {
-    return (
-      <View style={styles.chartWrap}>
-        <View style={[styles.singlePointChart, { borderColor: axisColor }]}>
-          <View style={[styles.singlePointGuideLine, { backgroundColor: axisColor }]} />
-          <View style={[styles.singlePointStub, { backgroundColor: lineColor }]} />
-          <View style={[styles.singlePointDot, { backgroundColor: lineColor, borderColor: lineColor }]} />
-        </View>
-        <View style={styles.singlePointFooter}>
-          <AppText variant="micro" tone="muted">
-            {points[0].label}
-          </AppText>
-          <AppText variant="micro" tone="muted">
-            Add one more workout to see a trend line
-          </AppText>
-        </View>
-      </View>
-    );
-  }
-
-  const labelStride = points.length > 6 ? 2 : 1;
-  const baseData: lineDataItem[] = points.map((point, index) => {
-    const shouldShowLabel = index % labelStride === 0;
-    const isFirstLabel = shouldShowLabel && index === 0;
-    const isLastLabel = shouldShowLabel && index === points.length - 1;
-    const labelTextAlign: 'left' | 'center' | 'right' = isFirstLabel
-      ? 'left'
-      : isLastLabel
-        ? 'right'
-        : 'center';
-
-    const perPointLabelTextStyle = shouldShowLabel
-      ? {
-          fontFamily: 'Unbounded_400Regular',
-          fontSize: 10,
-          lineHeight: 14,
-          letterSpacing: 0.35,
-          color: mutedColor,
-          textAlign: labelTextAlign,
-          paddingLeft: isFirstLabel ? 14 : 0,
-          paddingRight: isLastLabel ? 14 : 0,
-        }
-      : undefined;
-
-    return {
-      value: Number(point.valueKg.toFixed(2)),
-      label: shouldShowLabel ? point.label : '',
-      ...(perPointLabelTextStyle ? { labelTextStyle: perPointLabelTextStyle } : {}),
-    };
-  });
-  const chartData: lineDataItem[] = baseData;
-  const allValues = chartData.map((point) => point.value ?? 0);
-  const peakValue = Math.max(...allValues, 0);
-  const minValue = Math.min(...allValues, 0);
-  const hasNegativeValues = minValue < 0;
-  const computedMaxValue = hasNegativeValues
-    ? Math.ceil(Math.max(peakValue, Math.abs(minValue) * 0.1) * 1.08) || 1
-    : Math.ceil(peakValue * 1.08);
-  const computedMostNegativeValue = hasNegativeValues
-    ? Math.floor(minValue * 1.08)
-    : undefined;
-
-  return (
-    <View style={styles.chartWrap}>
-      <LineChart
-        areaChart
-        curved
-        isAnimated
-        animateOnDataChange
-        animationDuration={850}
-        data={chartData}
-        height={188}
-        noOfSections={4}
-        maxValue={computedMaxValue}
-        mostNegativeValue={computedMostNegativeValue}
-        thickness={3}
-        color={lineColor}
-        startFillColor={lineColor}
-        endFillColor={fillEndColor}
-        startOpacity={0.26}
-        endOpacity={0.06}
-        yAxisColor={axisColor}
-        xAxisColor={axisColor}
-        rulesColor={axisColor}
-        yAxisTextStyle={[styles.chartAxisText, { color: mutedColor }]}
-        xAxisLabelTextStyle={[styles.chartAxisText, { color: mutedColor }]}
-        yAxisLabelWidth={44}
-        hideDataPoints={false}
-        dataPointsRadius={4}
-        dataPointsColor={lineColor}
-        adjustToWidth
-        spacing={42}
-        initialSpacing={18}
-        endSpacing={18}
-        xAxisLabelsHeight={44}
-        xAxisLabelsVerticalShift={10}
-        hideOrigin
-        showVerticalLines={false}
-        showXAxisIndices={false}
-        showYAxisIndices={false}
-      />
-    </View>
-  );
-}
 
 export default function AnalyticsScreen() {
   const theme = useAppTheme();
@@ -179,147 +39,68 @@ export default function AnalyticsScreen() {
   const { layout } = designTokens;
 
   const workouts = useAppStore((state) => state.workouts);
-  const settings = useAppStore((state) => state.settings);
+  const unit = useAppStore((state) => state.settings.weightUnit);
 
-  const sessionLabelFormatter = useMemo(() => {
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-    });
-  }, []);
+  const [range, setRange] = useState<RangeId>('ALL');
+  const [selectedName, setSelectedName] = useState<string | null>(null);
+  const [preferredMetric, setPreferredMetric] = useState<MetricId>('e1rm');
 
-  const sessionTimeFormatter = useMemo(() => {
-    return new Intl.DateTimeFormat(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  }, []);
+  const scrollRef = useRef<ScrollView>(null);
+  const progressCardY = useRef(0);
 
-  const allSessions = useMemo(() => {
-    const flattened: SessionSummary[] = [];
+  const histories = useMemo(() => buildExerciseHistories(workouts), [workouts]);
+  const bodyweightSeries = useMemo(() => buildBodyweightSeries(workouts), [workouts]);
+  const rangeStart = useMemo(() => getRangeStart(range, Date.now()), [range]);
 
-    workouts.forEach((workout) => {
-      workout.sessions.forEach((session) => {
-        flattened.push({
-          workoutName: workout.name,
-          performedAt: session.performedAt,
-          bodyweightKg: session.bodyweightKg,
-          sets: session.sets.map((setEntry) => ({
-            exerciseName: setEntry.exerciseName,
-            reps: setEntry.reps,
-            weightKg: setEntry.weightKg,
-          })),
-        });
+  const selectedIndex = Math.max(
+    0,
+    histories.findIndex((history) => history.name === selectedName)
+  );
+  const selectedHistory = histories[selectedIndex] as ExerciseHistory | undefined;
+
+  // Bodyweight lifts can't show a 1RM, so fall back to their first metric
+  // without forgetting the preference for the next weighted exercise.
+  const getMetric = (history: ExerciseHistory): MetricId =>
+    history.metrics.includes(preferredMetric) ? preferredMetric : history.metrics[0];
+
+  const summary = useMemo(() => {
+    const sessionIds = new Set<string>();
+    let volumeKg = 0;
+    let prCount = 0;
+
+    histories.forEach((history) => {
+      history.points.forEach((point) => {
+        if (point.performedAt >= rangeStart) {
+          sessionIds.add(point.sessionKey);
+          volumeKg += point.values.volume;
+        }
       });
+      prCount += getMetricSeries(history, history.metrics[0], rangeStart, unit).prFlags.filter(Boolean).length;
     });
 
-    return flattened.sort((a, b) => a.performedAt - b.performedAt);
-  }, [workouts]);
+    return { sessions: sessionIds.size, volumeKg, prCount };
+  }, [histories, rangeStart, unit]);
 
-  const exerciseProgress = useMemo(() => {
-    const map = new Map<string, { performedAt: number; valueKg: number }[]>();
+  const selectExercise = (name: string) => {
+    setSelectedName(name);
+    scrollRef.current?.scrollTo({ y: Math.max(0, progressCardY.current - layout.screenTopInset), animated: true });
+  };
 
-    allSessions.forEach((session) => {
-      const byExercise = new Map<string, { weightedKg: number; reps: number }>();
+  const stepExercise = (direction: -1 | 1) => {
+    if (histories.length === 0) {
+      return;
+    }
 
-      session.sets.forEach((setEntry) => {
-        if (setEntry.reps <= 0) {
-          return;
-        }
-
-        const existing = byExercise.get(setEntry.exerciseName);
-        const weighted = setEntry.weightKg * setEntry.reps;
-
-        if (existing) {
-          existing.weightedKg += weighted;
-          existing.reps += setEntry.reps;
-          return;
-        }
-
-        byExercise.set(setEntry.exerciseName, {
-          weightedKg: weighted,
-          reps: setEntry.reps,
-        });
-      });
-
-      byExercise.forEach((value, exerciseName) => {
-        if (value.reps <= 0) {
-          return;
-        }
-
-        const existingSeries = map.get(exerciseName);
-        const point = {
-          performedAt: session.performedAt,
-          valueKg: value.weightedKg / value.reps,
-        };
-
-        if (existingSeries) {
-          existingSeries.push(point);
-          return;
-        }
-
-        map.set(exerciseName, [point]);
-      });
-    });
-
-    map.forEach((series) => {
-      series.sort((a, b) => a.performedAt - b.performedAt);
-    });
-
-    return map;
-  }, [allSessions]);
-
-  const exerciseNames = useMemo(() => {
-    return [...exerciseProgress.keys()].sort((a, b) => a.localeCompare(b));
-  }, [exerciseProgress]);
-
-  const exerciseAnalyticsCards = useMemo(() => {
-    return exerciseNames.map((exerciseName) => {
-      const series = exerciseProgress.get(exerciseName) ?? [];
-
-      return {
-        exerciseName,
-        sampleCount: series.length,
-        points: series.slice(-10).map((point) => ({
-          label: sessionLabelFormatter.format(new Date(point.performedAt)),
-          valueKg: point.valueKg,
-        })),
-        startValueKg: series.length > 0 ? series[0].valueKg : null,
-        latestValueKg: series.length > 0 ? series[series.length - 1].valueKg : null,
-      };
-    });
-  }, [exerciseNames, exerciseProgress, sessionLabelFormatter]);
-
-  const bodyweightSeries = useMemo(() => {
-    return allSessions.filter((session) => session.bodyweightKg !== null && session.bodyweightKg > 0);
-  }, [allSessions]);
-
-  const recentBodyweightPoints = useMemo(() => {
-    return bodyweightSeries.slice(-10).map((session) => ({
-      label: sessionLabelFormatter.format(new Date(session.performedAt)),
-      valueKg: session.bodyweightKg ?? 0,
-    }));
-  }, [bodyweightSeries, sessionLabelFormatter]);
-
-  const sessionCount = allSessions.length;
-  const latestSession = allSessions.length > 0 ? allSessions[allSessions.length - 1] : null;
-
-  const bodyweightStart = bodyweightSeries.length > 0 ? bodyweightSeries[0].bodyweightKg : null;
-  const bodyweightLatest =
-    bodyweightSeries.length > 0 ? bodyweightSeries[bodyweightSeries.length - 1].bodyweightKg : null;
+    const next = (selectedIndex + direction + histories.length) % histories.length;
+    setSelectedName(histories[next].name);
+  };
 
   return (
-    <View
-      style={[
-        styles.screen,
-        {
-          backgroundColor: theme.palette.background,
-        },
-      ]}>
+    <View style={[styles.screen, { backgroundColor: theme.palette.background }]}>
       <NeonGridBackground />
 
       <ScrollView
+        ref={scrollRef}
         bounces={false}
         alwaysBounceVertical={false}
         overScrollMode="never"
@@ -331,195 +112,82 @@ export default function AnalyticsScreen() {
           },
         ]}
         showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.hero,
-            {
-              borderColor: theme.palette.border,
-              backgroundColor: theme.palette.panel,
-            },
-          ]}>
+        <View style={styles.header}>
           <AppText variant="display">Analytics</AppText>
-          <AppText tone="muted">
-            Track exercise load progression and bodyweight trends across completed sessions.
-          </AppText>
-        </View>
-
-        <View
-          style={[
-            styles.summaryRow,
-            {
-              borderColor: theme.palette.border,
-              backgroundColor: theme.palette.panel,
-            },
-          ]}>
-          <View style={styles.summaryCell}>
-            <AppText variant="micro" tone="muted">
-              Completed Sessions
-            </AppText>
-            <AppText variant="heading">{sessionCount}</AppText>
-          </View>
-          <View style={styles.summaryCell}>
-            <AppText variant="micro" tone="muted">
-              Last Workout
-            </AppText>
-            <AppText variant="heading">
-              {latestSession ? sessionTimeFormatter.format(new Date(latestSession.performedAt)) : 'None'}
-            </AppText>
-            {latestSession ? (
-              <AppText variant="micro" tone="muted">
-                {latestSession.workoutName}
-              </AppText>
-            ) : null}
-          </View>
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              borderColor: theme.palette.border,
-              backgroundColor: theme.palette.panel,
-            },
-          ]}>
-          <AppText variant="heading">Exercise Progression</AppText>
-
-          {exerciseAnalyticsCards.length > 0 ? (
-            <View style={styles.exercisePanelsWrap}>
-              {exerciseAnalyticsCards.map((exerciseCard) => (
-                <View
-                  key={exerciseCard.exerciseName}
-                  style={[
-                    styles.exercisePanel,
-                    {
-                      borderColor: theme.palette.border,
-                      backgroundColor: theme.palette.panelSoft,
-                    },
-                  ]}>
-                  <AppText variant="label">{exerciseCard.exerciseName}</AppText>
-
-                  <MetricLineChart
-                    points={exerciseCard.points}
-                    lineColor={theme.palette.accent}
-                    fillEndColor={theme.palette.panelSoft}
-                    axisColor={theme.palette.border}
-                    mutedColor={theme.palette.textMuted}
-                  />
-
-                  <View style={styles.metricRow}>
-                    <View
-                      style={[
-                        styles.metricCard,
-                        {
-                          borderColor: theme.palette.border,
-                          backgroundColor: theme.palette.panel,
-                        },
-                      ]}>
-                      <AppText variant="micro" tone="muted">
-                        First Avg Load
-                      </AppText>
-                      <AppText tone="accent">
-                        {exerciseCard.startValueKg === null
-                          ? 'N/A'
-                          : formatWeightFromKg(Math.abs(exerciseCard.startValueKg), settings.weightUnit)}
-                      </AppText>
-                    </View>
-                    <View
-                      style={[
-                        styles.metricCard,
-                        {
-                          borderColor: theme.palette.border,
-                          backgroundColor: theme.palette.panel,
-                        },
-                      ]}>
-                      <AppText variant="micro" tone="muted">
-                        Latest Avg Load
-                      </AppText>
-                      <AppText tone="accent">
-                        {exerciseCard.latestValueKg === null
-                          ? 'N/A'
-                          : formatWeightFromKg(Math.abs(exerciseCard.latestValueKg), settings.weightUnit)}
-                      </AppText>
-                    </View>
-                  </View>
-
-                  <AppText tone="muted">
-                    Change:{' '}
-                    {exerciseCard.startValueKg !== null && exerciseCard.latestValueKg !== null
-                      ? toPercentChange(
-                          exerciseCard.startValueKg,
-                          exerciseCard.latestValueKg,
-                          exerciseCard.sampleCount,
-                        )
-                      : 'N/A'}
-                  </AppText>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <AppText tone="muted">Complete workouts to unlock exercise analytics.</AppText>
-          )}
-        </View>
-
-        <View
-          style={[
-            styles.card,
-            {
-              borderColor: theme.palette.border,
-              backgroundColor: theme.palette.panel,
-            },
-          ]}>
-          <AppText variant="heading">Bodyweight Trend</AppText>
-
-          <MetricLineChart
-            points={recentBodyweightPoints}
-            lineColor={theme.palette.accentSecondary}
-            fillEndColor={theme.palette.panelSoft}
-            axisColor={theme.palette.border}
-            mutedColor={theme.palette.textMuted}
+          <SegmentedControl
+            theme={theme}
+            accessibilityLabel="Time range"
+            options={RANGE_OPTIONS}
+            value={range}
+            onChange={setRange}
           />
-
-          <View style={styles.metricRow}>
-            <View
-              style={[
-                styles.metricCard,
-                {
-                  borderColor: theme.palette.border,
-                  backgroundColor: theme.palette.panelSoft,
-                },
-              ]}>
-              <AppText variant="micro" tone="muted">
-                First Logged
-              </AppText>
-              <AppText tone="accent">
-                {bodyweightStart === null ? 'N/A' : formatWeightFromKg(bodyweightStart, settings.weightUnit)}
-              </AppText>
-            </View>
-            <View
-              style={[
-                styles.metricCard,
-                {
-                  borderColor: theme.palette.border,
-                  backgroundColor: theme.palette.panelSoft,
-                },
-              ]}>
-              <AppText variant="micro" tone="muted">
-                Latest Logged
-              </AppText>
-              <AppText tone="accent">
-                {bodyweightLatest === null ? 'N/A' : formatWeightFromKg(bodyweightLatest, settings.weightUnit)}
-              </AppText>
-            </View>
-          </View>
-
-          <AppText tone="muted">
-            Change:{' '}
-            {bodyweightStart !== null && bodyweightLatest !== null
-              ? toPercentChange(bodyweightStart, bodyweightLatest, bodyweightSeries.length)
-              : 'N/A'}
-          </AppText>
         </View>
+
+        <View style={[styles.summaryRow, { borderColor: theme.palette.border, backgroundColor: theme.palette.panel }]}>
+          <SummaryCell label="Sessions" value={String(summary.sessions)} />
+          <View style={[styles.summaryDivider, { backgroundColor: theme.palette.border }]} />
+          <SummaryCell label="Volume" value={formatMetricValue(summary.volumeKg, 'volume', unit)} />
+          <View style={[styles.summaryDivider, { backgroundColor: theme.palette.border }]} />
+          <SummaryCell label="PRs" value={summary.prCount > 0 ? `★ ${summary.prCount}` : '0'} accent={summary.prCount > 0} />
+        </View>
+
+        {selectedHistory ? (
+          <>
+            <View
+              onLayout={(event) => {
+                progressCardY.current = event.nativeEvent.layout.y;
+              }}>
+              <ExerciseProgressCard
+                theme={theme}
+                history={selectedHistory}
+                position={{ index: selectedIndex, count: histories.length }}
+                metric={getMetric(selectedHistory)}
+                onMetricChange={setPreferredMetric}
+                onStep={stepExercise}
+                rangeStart={rangeStart}
+                rangeLabel={RANGE_LABELS[range]}
+                unit={unit}
+              />
+            </View>
+
+            <ExerciseList
+              theme={theme}
+              histories={histories}
+              selectedName={selectedHistory.name}
+              getMetric={getMetric}
+              onSelect={selectExercise}
+              rangeStart={rangeStart}
+              unit={unit}
+            />
+          </>
+        ) : (
+          <View style={[styles.emptyCard, { borderColor: theme.palette.border, backgroundColor: theme.palette.panel }]}>
+            <AppText variant="heading">No sessions yet</AppText>
+            <AppText tone="muted">Finish a workout and your progress charts will show up here.</AppText>
+          </View>
+        )}
+
+        <BodyweightCard
+          theme={theme}
+          series={bodyweightSeries}
+          rangeStart={rangeStart}
+          rangeLabel={RANGE_LABELS[range]}
+          unit={unit}
+        />
       </ScrollView>
+    </View>
+  );
+}
+
+function SummaryCell({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View style={styles.summaryCell}>
+      <AppText variant="micro" tone="muted">
+        {label}
+      </AppText>
+      <AppText variant="heading" tone={accent ? 'accent' : 'primary'} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </AppText>
     </View>
   );
 }

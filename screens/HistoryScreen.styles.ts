@@ -4,6 +4,7 @@ import { designTokens } from '@/constants/design-system';
 
 const { border, layout, radii, sizes, spacing } = designTokens;
 const CALENDAR_COLUMN_WIDTH = '14.285714%';
+const CALENDAR_DAY_SIZE = 34;
 
 export const styles = StyleSheet.create({
   screen: {
@@ -11,182 +12,155 @@ export const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: layout.screenHorizontalInset,
-    gap: spacing.xl,
+    gap: spacing.xxl,
   },
-  hero: {
-    borderWidth: border.thin,
-    borderRadius: radii.hero,
-    padding: spacing.lg,
+  header: {
     gap: spacing.xxs,
+    paddingTop: spacing.xs,
   },
-  summaryRow: {
+  statStrip: {
     borderWidth: border.thin,
     borderRadius: radii.panel,
-    padding: spacing.lg,
+    paddingVertical: spacing.lg,
     flexDirection: 'row',
-    gap: spacing.lg,
+    alignItems: 'center',
   },
-  summaryCell: {
+  statCell: {
     flex: 1,
-    gap: spacing.xs,
+    alignItems: 'center',
+    gap: spacing.xxs,
+  },
+  statDivider: {
+    width: border.thin,
+    alignSelf: 'stretch',
   },
   calendarCard: {
     borderWidth: border.thin,
     borderRadius: radii.panel,
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.xs,
   },
   calendarHeader: {
-    gap: spacing.sm,
-  },
-  calendarTitleWrap: {
-    gap: spacing.xxs,
-  },
-  calendarMonthRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    marginBottom: spacing.xs,
   },
   calendarMonthLabel: {
     flex: 1,
-    textAlign: 'center',
-    fontFamily: 'Unbounded_500Medium',
-    fontSize: 13,
-    lineHeight: 16,
   },
   calendarNavButton: {
     width: sizes.iconButton,
     height: sizes.iconButton,
-    borderWidth: border.thin,
-    borderRadius: radii.lg,
+    borderRadius: radii.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calendarWeekRow: {
+  calendarRow: {
     flexDirection: 'row',
   },
-  calendarWeekCell: {
+  calendarCell: {
     width: CALENDAR_COLUMN_WIDTH,
-    paddingHorizontal: spacing.xxxs,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: CALENDAR_DAY_SIZE,
   },
-  calendarWeekLabel: {
-    width: '100%',
-    textAlign: 'center',
-  },
-  calendarGrid: {
-    gap: spacing.xxs,
-  },
-  calendarGridWeekRow: {
-    flexDirection: 'row',
-  },
-  calendarDayCellSlot: {
-    width: CALENDAR_COLUMN_WIDTH,
-    paddingHorizontal: spacing.xxxs,
-  },
-  calendarDayCell: {
-    width: '100%',
-    aspectRatio: 1,
-    borderWidth: border.thin,
-    borderRadius: radii.md,
+  calendarDay: {
+    width: CALENDAR_DAY_SIZE,
+    height: CALENDAR_DAY_SIZE,
+    borderRadius: radii.pill,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   calendarDayLabel: {
-    textAlign: 'center',
-    fontFamily: 'Unbounded_500Medium',
     fontSize: 12,
     lineHeight: 14,
+    textAlign: 'center',
     includeFontPadding: false,
   },
-  calendarDayLabelWrap: {
-    flex: 1,
-    width: '100%',
+  calendarDayLabelStrong: {
+    fontFamily: 'Unbounded_500Medium',
+  },
+  filterRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  filterLabel: {
+    flex: 1,
+  },
+  filterClear: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  section: {
+    gap: spacing.sm,
+  },
+  sectionLabel: {
+    paddingHorizontal: spacing.xxs,
+  },
+  sessionRow: {
+    borderWidth: border.thin,
+    borderRadius: radii.card,
+    paddingVertical: spacing.lg,
+    paddingLeft: spacing.lg,
+    paddingRight: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.lg,
+  },
+  sessionDate: {
+    width: 40,
+    alignItems: 'center',
+    gap: spacing.xxxs,
+  },
+  sessionDivider: {
+    width: border.thin,
+    alignSelf: 'stretch',
+  },
+  sessionBody: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  sessionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  sessionTitle: {
+    flex: 1,
+  },
+  sessionPreview: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  sessionMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: spacing.lg,
+    rowGap: spacing.xxs,
+  },
+  sessionMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xxs,
   },
   emptyCard: {
     borderWidth: border.thin,
     borderRadius: radii.panel,
-    padding: layout.screenHorizontalInset,
-    gap: spacing.sm,
-  },
-  sessionCard: {
-    borderWidth: border.thin,
-    borderRadius: radii.card,
-    padding: spacing.sm,
-    gap: spacing.sm,
-  },
-  sessionTopRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    gap: spacing.md,
-  },
-  sessionDateBadge: {
-    width: 70,
-    borderWidth: border.thin,
-    borderTopLeftRadius: radii.xl,
-    borderBottomLeftRadius: radii.xl,
-    borderTopRightRadius: 0,
-    borderBottomRightRadius: 0,
+    paddingVertical: spacing.giant,
+    paddingHorizontal: spacing.xxl,
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xxs,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  sessionCardBody: {
-    flex: 1,
-    gap: spacing.md,
-  },
-  sessionHeadlineRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'flex-start',
-  },
-  sessionHeaderText: {
-    flex: 1,
-    gap: spacing.xxs,
-  },
-  volumeBadge: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    gap: spacing.xxs,
-    minWidth: 110,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.sm,
   },
-  statCard: {
-    width: '48%',
-    minHeight: 78,
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xxs,
-  },
-  sessionFooterRow: {
-    gap: spacing.sm,
-  },
-  sessionFooterText: {
-    gap: spacing.xxs,
-  },
-  bodyweightBadge: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xxs,
-  },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
+  emptyText: {
+    textAlign: 'center',
   },
 });

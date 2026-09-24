@@ -64,11 +64,6 @@ export const styles = StyleSheet.create({
   },
   setBoxMain: {
     flex: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    gap: spacing.xxxs,
   },
   setBoxWeightBar: {
     flex: 1,

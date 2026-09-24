@@ -21,6 +21,30 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
+    requestHighestRefreshRate()
+  }
+
+  /**
+   * Many OEM builds keep apps at 60Hz unless they ask for more. Pick the fastest
+   * display mode at the current resolution so scrolling/animations can run at 90/120Hz.
+   */
+  private fun requestHighestRefreshRate() {
+    val currentDisplay =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
+        else @Suppress("DEPRECATION") windowManager.defaultDisplay
+    currentDisplay ?: return
+
+    val currentMode = currentDisplay.mode
+    val fastestMode = currentDisplay.supportedModes
+        .filter {
+          it.physicalWidth == currentMode.physicalWidth &&
+              it.physicalHeight == currentMode.physicalHeight
+        }
+        .maxByOrNull { it.refreshRate } ?: return
+
+    if (fastestMode.modeId != currentMode.modeId) {
+      window.attributes = window.attributes.apply { preferredDisplayModeId = fastestMode.modeId }
+    }
   }
 
   /**

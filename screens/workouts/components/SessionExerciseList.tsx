@@ -8,6 +8,7 @@ import { formatWeightFromKg, isAssistedWeightKg } from '@/lib/weight';
 
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
 import { formatDuration } from '../utils';
+import { SetRepMeter } from './SetRepMeter';
 import { styles } from './SessionExerciseList.styles';
 
 const { opacity } = designTokens;
@@ -151,9 +152,7 @@ export function SessionExerciseList({
                       styles.setBox,
                       {
                         borderColor: completed ? theme.palette.accent : theme.palette.border,
-                        backgroundColor: completed
-                          ? `${theme.palette.accent}22`
-                          : theme.palette.panelSoft,
+                        backgroundColor: theme.palette.panelSoft,
                       },
                     ]}
                   >
@@ -179,18 +178,13 @@ export function SessionExerciseList({
                         { opacity: pressed ? opacity.pressedSoft : 1 },
                       ]}
                     >
-                      <AppText variant="micro" tone="muted">
-                        Set {setEntry.setNumber}
-                      </AppText>
-                      <AppText variant="heading" tone={completed ? 'accent' : 'primary'}>
-                        {completed ? setEntry.actualReps : '--'}
-                      </AppText>
-                      <AppText variant="micro" tone="muted">
-                        / {setEntry.targetReps}
-                      </AppText>
-                      <AppText variant="micro" tone="muted">
-                        Prev {setEntry.previousReps ?? '--'}
-                      </AppText>
+                      <SetRepMeter
+                        theme={theme}
+                        setNumber={setEntry.setNumber}
+                        actualReps={setEntry.actualReps}
+                        targetReps={setEntry.targetReps}
+                        previousReps={setEntry.previousReps}
+                      />
                     </Pressable>
 
                     <Pressable
@@ -201,16 +195,16 @@ export function SessionExerciseList({
                         styles.setBoxWeightBar,
                         {
                           borderTopColor: completed
-                            ? `${theme.palette.accentContrast}33`
+                            ? theme.palette.accent
                             : theme.palette.border,
                           backgroundColor: completed
-                            ? theme.palette.accent
+                            ? `${theme.palette.accent}1f`
                             : `${theme.palette.background}4a`,
                           opacity: pressed ? opacity.pressedSoft : 1,
                         },
                       ]}
                     >
-                      <AppText variant="micro" tone={completed ? 'inverse' : 'muted'}>
+                      <AppText variant="micro" tone={completed ? 'accent' : 'muted'}>
                         {setWeight}
                         {setIsAssisted ? ' assisted' : ''}
                       </AppText>

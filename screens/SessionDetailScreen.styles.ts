@@ -2,7 +2,9 @@ import { StyleSheet } from 'react-native';
 
 import { designTokens } from '@/constants/design-system';
 
-const { border, layout, radii, spacing } = designTokens;
+const { border, layout, radii, sizes, spacing, typography } = designTokens;
+const SET_NUMBER_COLUMN_WIDTH = 44;
+const SET_NUMBER_BADGE_SIZE = 26;
 
 export const styles = StyleSheet.create({
   screen: {
@@ -10,77 +12,118 @@ export const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: layout.screenHorizontalInset,
-    gap: spacing.xl,
+    gap: spacing.xxl,
   },
-  backButton: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
-    alignSelf: 'flex-start',
+    gap: spacing.md,
   },
-  hero: {
+  backButton: {
+    width: sizes.controlMinHeight,
+    height: sizes.controlMinHeight,
+    borderWidth: border.thin,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleBlock: {
+    gap: spacing.xs,
+  },
+  volumeCard: {
     borderWidth: border.thin,
     borderRadius: radii.hero,
-    padding: spacing.xl,
-    gap: spacing.sm,
+    padding: spacing.xxl,
+    gap: spacing.lg,
   },
-  summaryGrid: {
+  volumeHeadline: {
+    gap: spacing.xxs,
+  },
+  volumeDivider: {
+    height: border.thin,
+  },
+  statRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
   },
-  summaryCard: {
-    width: '48%',
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    padding: spacing.md,
+  statCell: {
+    flex: 1,
     gap: spacing.xxs,
   },
-  utilityRow: {
-    gap: spacing.sm,
-  },
-  utilityCard: {
+  bodyweightRow: {
     borderWidth: border.thin,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    borderRadius: radii.panel,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
   },
-  utilityHint: {
-    gap: spacing.xxs,
+  bodyweightText: {
+    flex: 1,
+    gap: spacing.xxxs,
   },
-  exerciseSection: {
+  bodyweightInput: {
+    width: 110,
+  },
+  exerciseCard: {
     borderWidth: border.thin,
     borderRadius: radii.panel,
     padding: spacing.lg,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   exerciseHeader: {
-    gap: spacing.xxs,
-  },
-  setCard: {
-    borderWidth: border.thin,
-    borderRadius: radii.xl,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  setHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: spacing.md,
+    marginBottom: spacing.xxs,
   },
-  setHeaderBadge: {
-    borderWidth: border.thin,
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+  exerciseName: {
+    flex: 1,
   },
-  setInputsRow: {
+  setTableHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingBottom: spacing.xs,
+    borderBottomWidth: border.thin,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.sm,
   },
-  setInputCell: {
+  setNumberColumn: {
+    width: SET_NUMBER_COLUMN_WIDTH,
+  },
+  setNumberBadge: {
+    width: SET_NUMBER_BADGE_SIZE,
+    height: SET_NUMBER_BADGE_SIZE,
+    borderRadius: radii.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  setNumberText: {
+    fontFamily: 'Unbounded_500Medium',
+    letterSpacing: 0,
+  },
+  setInputColumn: {
     flex: 1,
+  },
+  compactInput: {
+    minHeight: sizes.controlMinHeight,
+    borderWidth: border.thin,
+    borderRadius: radii.lg,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  compactInputText: {
+    flex: 1,
+    fontFamily: 'Unbounded_500Medium',
+    fontSize: typography.inputBodySize,
+    lineHeight: typography.inputBodyLineHeight,
+    paddingVertical: spacing.sm,
   },
   missingCard: {
     borderWidth: border.thin,

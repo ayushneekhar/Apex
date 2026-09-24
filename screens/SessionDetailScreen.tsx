@@ -2,13 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import {
+  Pressable,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/components/ui/app-text';
 import { NeonButton } from '@/components/ui/neon-button';
 import { NeonGridBackground } from '@/components/ui/neon-grid-background';
-import { NeonInput } from '@/components/ui/neon-input';
+import type { AppTheme } from '@/constants/app-themes';
 import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
@@ -66,6 +74,12 @@ function createSessionSetDrafts(
     }));
 }
 
+function getBodyweightInput(session: WorkoutSession | null, weightUnit: 'kg' | 'lb'): string {
+  return session?.bodyweightKg == null
+    ? ''
+    : formatWeightInputFromKg(session.bodyweightKg, weightUnit);
+}
+
 export default function SessionDetailScreen() {
   const theme = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -88,8 +102,12 @@ export default function SessionDetailScreen() {
     [sessionId, workout]
   );
 
-  const [draftBodyweight, setDraftBodyweight] = useState('');
-  const [draftSets, setDraftSets] = useState<SessionSetDraft[]>([]);
+  const [draftBodyweight, setDraftBodyweight] = useState(() =>
+    getBodyweightInput(session, settings.weightUnit)
+  );
+  const [draftSets, setDraftSets] = useState<SessionSetDraft[]>(() =>
+    session ? createSessionSetDrafts(session, settings.weightUnit) : []
+  );
   const [editError, setEditError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -97,11 +115,7 @@ export default function SessionDetailScreen() {
       return;
     }
 
-    setDraftBodyweight(
-      session.bodyweightKg === null
-        ? ''
-        : formatWeightInputFromKg(session.bodyweightKg, settings.weightUnit)
-    );
+    setDraftBodyweight(getBodyweightInput(session, settings.weightUnit));
     setDraftSets(createSessionSetDrafts(session, settings.weightUnit));
     setEditError(null);
   }, [session, settings.weightUnit]);
@@ -109,7 +123,7 @@ export default function SessionDetailScreen() {
   const sessionDateFormatter = useMemo(
     () =>
       new Intl.DateTimeFormat(undefined, {
-        weekday: 'short',
+        weekday: 'long',
         month: 'short',
         day: 'numeric',
         year: 'numeric',
@@ -137,6 +151,29 @@ export default function SessionDetailScreen() {
     session?.durationMs === null || session?.durationMs === undefined
       ? 'Unknown'
       : formatDuration(session.durationMs);
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!session) {
+      return false;
+    }
+
+    if (draftBodyweight.trim() !== getBodyweightInput(session, settings.weightUnit)) {
+      return true;
+    }
+
+    const originalDrafts = new Map(
+      createSessionSetDrafts(session, settings.weightUnit).map((draft) => [draft.id, draft])
+    );
+
+    return draftSets.some((draft) => {
+      const original = originalDrafts.get(draft.id);
+      return (
+        !original ||
+        original.repsInput !== draft.repsInput.trim() ||
+        original.weightInput !== draft.weightInput.trim()
+      );
+    });
+  }, [draftBodyweight, draftSets, session, settings.weightUnit]);
 
   const updateDraftSet = (id: string, patch: Partial<SessionSetDraft>) => {
     setDraftSets((current) =>
@@ -217,47 +254,41 @@ export default function SessionDetailScreen() {
     }
   };
 
+  const renderBackButton = () => (
+    <Pressable
+      onPress={() => navigation.goBack()}
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.backButton,
+        {
+          borderColor: theme.palette.border,
+          backgroundColor: theme.palette.panel,
+          opacity: pressed ? opacity.pressedSoft : 1,
+        },
+      ]}
+    >
+      <Ionicons
+        name="chevron-back"
+        size={designTokens.sizes.iconSmall}
+        color={theme.palette.textPrimary}
+      />
+    </Pressable>
+  );
+
   if (!workout || !session) {
     return (
-      <View
-        style={[
-          styles.screen,
-          {
-            backgroundColor: theme.palette.background,
-          },
-        ]}
-      >
+      <View style={[styles.screen, { backgroundColor: theme.palette.background }]}>
         <NeonGridBackground />
 
-        <ScrollView
-          bounces={false}
-          alwaysBounceVertical={false}
-          overScrollMode="never"
-          contentContainerStyle={[
+        <View
+          style={[
             styles.content,
             {
               paddingTop: insets.top + layout.screenTopInset,
-              paddingBottom: insets.bottom + layout.screenBottomInset,
             },
           ]}
-          showsVerticalScrollIndicator={false}
         >
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }) => [
-              styles.backButton,
-              {
-                opacity: pressed ? opacity.pressedSoft : 1,
-              },
-            ]}
-          >
-            <Ionicons
-              name="chevron-back"
-              size={designTokens.sizes.iconSmall}
-              color={theme.palette.textPrimary}
-            />
-            <AppText variant="label">History</AppText>
-          </Pressable>
+          {renderBackButton()}
 
           <View
             style={[
@@ -268,28 +299,29 @@ export default function SessionDetailScreen() {
               },
             ]}
           >
-            <AppText variant="heading">Session not found</AppText>
+            <AppText variant="label">Session not found</AppText>
             <AppText tone="muted">
               This workout log may have been deleted while you were viewing it.
             </AppText>
           </View>
-        </ScrollView>
+        </View>
       </View>
     );
   }
 
+  const summaryStats = [
+    { label: 'Duration', value: durationLabel },
+    { label: 'Sets', value: String(session.sets.length) },
+    { label: 'Reps', value: String(totalReps) },
+  ];
+
   return (
-    <View
-      style={[
-        styles.screen,
-        {
-          backgroundColor: theme.palette.background,
-        },
-      ]}
-    >
+    <View style={[styles.screen, { backgroundColor: theme.palette.background }]}>
       <NeonGridBackground />
 
-      <ScrollView
+      <KeyboardAwareScrollView
+        bottomOffset={layout.screenTopInset}
+        keyboardShouldPersistTaps="handled"
         bounces={false}
         alwaysBounceVertical={false}
         overScrollMode="never"
@@ -302,239 +334,214 @@ export default function SessionDetailScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={({ pressed }) => [
-            styles.backButton,
-            {
-              opacity: pressed ? opacity.pressedSoft : 1,
-            },
-          ]}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={designTokens.sizes.iconSmall}
-            color={theme.palette.textPrimary}
-          />
-          <AppText variant="label">History</AppText>
-        </Pressable>
+        <View style={styles.topBar}>
+          {renderBackButton()}
+          <AppText variant="micro" tone="muted">
+            Session log
+          </AppText>
+        </View>
+
+        <View style={styles.titleBlock}>
+          <AppText variant="micro" tone="accent">
+            {sessionDateFormatter.format(new Date(session.performedAt))}
+          </AppText>
+          <AppText variant="title">{workout.name}</AppText>
+        </View>
 
         <View
           style={[
-            styles.hero,
+            styles.volumeCard,
+            {
+              borderColor: `${theme.palette.accent}55`,
+              backgroundColor: `${theme.palette.accent}12`,
+            },
+          ]}
+        >
+          <View style={styles.volumeHeadline}>
+            <AppText variant="micro" tone="muted">
+              Total volume
+            </AppText>
+            <AppText variant="display" tone="accent" numberOfLines={1} adjustsFontSizeToFit>
+              {formatWeightFromKg(totalVolumeKg, settings.weightUnit)}
+            </AppText>
+          </View>
+
+          <View style={[styles.volumeDivider, { backgroundColor: `${theme.palette.accent}33` }]} />
+
+          <View style={styles.statRow}>
+            {summaryStats.map((stat) => (
+              <View key={stat.label} style={styles.statCell}>
+                <AppText variant="label">{stat.value}</AppText>
+                <AppText variant="micro" tone="muted">
+                  {stat.label}
+                </AppText>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View
+          style={[
+            styles.bodyweightRow,
             {
               borderColor: theme.palette.border,
               backgroundColor: theme.palette.panel,
             },
           ]}
         >
-          <AppText variant="micro" tone="accent">
-            SESSION LOG
-          </AppText>
-          <AppText variant="title">{workout.name}</AppText>
-          <AppText tone="muted">
-            {sessionDateFormatter.format(new Date(session.performedAt))}
-          </AppText>
+          <Ionicons name="body-outline" size={18} color={theme.palette.textMuted} />
+          <View style={styles.bodyweightText}>
+            <AppText variant="label">Bodyweight</AppText>
+            <AppText variant="micro" tone="muted">
+              Optional
+            </AppText>
+          </View>
+          <CompactInput
+            theme={theme}
+            keyboardType={WEIGHT_KEYBOARD_TYPE}
+            value={draftBodyweight}
+            onChangeText={setDraftBodyweight}
+            placeholder="--"
+            suffix={settings.weightUnit}
+            style={styles.bodyweightInput}
+          />
         </View>
 
-        <View style={styles.summaryGrid}>
-          <View
-            style={[
-              styles.summaryCard,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <AppText variant="micro" tone="muted">
-              Exercises
-            </AppText>
-            <AppText variant="heading">{groupedSessionSets.length}</AppText>
-          </View>
-          <View
-            style={[
-              styles.summaryCard,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <AppText variant="micro" tone="muted">
-              Total Sets
-            </AppText>
-            <AppText variant="heading">{session.sets.length}</AppText>
-          </View>
-          <View
-            style={[
-              styles.summaryCard,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <AppText variant="micro" tone="muted">
-              Reps
-            </AppText>
-            <AppText variant="heading">{totalReps}</AppText>
-          </View>
-          <View
-            style={[
-              styles.summaryCard,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <AppText variant="micro" tone="muted">
-              Volume
-            </AppText>
-            <AppText variant="heading" tone="accent">
-              {formatWeightFromKg(totalVolumeKg, settings.weightUnit)}
-            </AppText>
-          </View>
-        </View>
+        {groupedSessionSets.map((group) => {
+          const groupVolumeKg = group.sets.reduce(
+            (total, setEntry) => total + Math.abs(setEntry.weightKg) * setEntry.reps,
+            0
+          );
 
-        <View style={styles.utilityRow}>
-          <View
-            style={[
-              styles.utilityCard,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <View style={styles.utilityHint}>
-              <AppText variant="micro" tone="muted">
-                Workout Duration
-              </AppText>
-              <AppText variant="heading">{durationLabel}</AppText>
-            </View>
-            <AppText tone="muted">
-              Locked after the session is finished so the recorded time stays accurate.
-            </AppText>
-          </View>
+          return (
+            <View
+              key={group.workoutExerciseId}
+              style={[
+                styles.exerciseCard,
+                {
+                  borderColor: theme.palette.border,
+                  backgroundColor: theme.palette.panel,
+                },
+              ]}
+            >
+              <View style={styles.exerciseHeader}>
+                <AppText variant="label" style={styles.exerciseName} numberOfLines={2}>
+                  {group.exerciseName}
+                </AppText>
+                <AppText variant="micro" tone="muted">
+                  {formatWeightFromKg(groupVolumeKg, settings.weightUnit)}
+                </AppText>
+              </View>
 
-          <View
-            style={[
-              styles.utilityCard,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <NeonInput
-              label="Bodyweight"
-              helperText="Optional"
-              keyboardType={WEIGHT_KEYBOARD_TYPE}
-              value={draftBodyweight}
-              onChangeText={setDraftBodyweight}
-              suffix={settings.weightUnit}
-            />
-          </View>
-        </View>
+              <View style={[styles.setTableHeader, { borderBottomColor: theme.palette.border }]}>
+                <AppText variant="micro" tone="muted" style={styles.setNumberColumn}>
+                  Set
+                </AppText>
+                <AppText variant="micro" tone="muted" style={styles.setInputColumn}>
+                  Reps
+                </AppText>
+                <AppText variant="micro" tone="muted" style={styles.setInputColumn}>
+                  Weight ({settings.weightUnit})
+                </AppText>
+              </View>
 
-        {groupedSessionSets.map((group) => (
-          <View
-            key={group.workoutExerciseId}
-            style={[
-              styles.exerciseSection,
-              {
-                borderColor: theme.palette.border,
-                backgroundColor: theme.palette.panel,
-              },
-            ]}
-          >
-            <View style={styles.exerciseHeader}>
-              <AppText variant="heading">{group.exerciseName}</AppText>
-              <AppText tone="muted">
-                {group.sets.length} set{group.sets.length === 1 ? '' : 's'} logged
-              </AppText>
-            </View>
+              {group.sets.map((setEntry) => {
+                const draft = setEntry.draft;
 
-            {group.sets.map((setEntry) => {
-              const draft = setEntry.draft;
+                if (!draft) {
+                  return null;
+                }
 
-              if (!draft) {
-                return null;
-              }
-
-              return (
-                <View
-                  key={setEntry.id}
-                  style={[
-                    styles.setCard,
-                    {
-                      borderColor: theme.palette.border,
-                      backgroundColor: theme.palette.panelSoft,
-                    },
-                  ]}
-                >
-                  <View style={styles.setHeader}>
-                    <View
-                      style={[
-                        styles.setHeaderBadge,
-                        {
-                          borderColor: theme.palette.border,
-                          backgroundColor: theme.palette.panel,
-                        },
-                      ]}
-                    >
-                      <AppText variant="label">Set {setEntry.setNumber}</AppText>
+                return (
+                  <View key={setEntry.id} style={styles.setRow}>
+                    <View style={styles.setNumberColumn}>
+                      <View
+                        style={[
+                          styles.setNumberBadge,
+                          {
+                            backgroundColor: setEntry.reps > 0
+                              ? theme.palette.accent
+                              : theme.palette.panelSoft,
+                          },
+                        ]}
+                      >
+                        <AppText
+                          variant="micro"
+                          tone={setEntry.reps > 0 ? 'inverse' : 'muted'}
+                          style={styles.setNumberText}
+                        >
+                          {setEntry.setNumber}
+                        </AppText>
+                      </View>
                     </View>
-                    <AppText tone="muted">
-                      Recorded volume{' '}
-                      {formatWeightFromKg(
-                        Math.abs(setEntry.weightKg) * setEntry.reps,
-                        settings.weightUnit
-                      )}
-                    </AppText>
+                    <CompactInput
+                      theme={theme}
+                      keyboardType="number-pad"
+                      value={draft.repsInput}
+                      onChangeText={(value) => updateDraftSet(draft.id, { repsInput: value })}
+                      style={styles.setInputColumn}
+                    />
+                    <CompactInput
+                      theme={theme}
+                      keyboardType={WEIGHT_KEYBOARD_TYPE}
+                      value={draft.weightInput}
+                      onChangeText={(value) => updateDraftSet(draft.id, { weightInput: value })}
+                      style={styles.setInputColumn}
+                    />
                   </View>
-
-                  <View style={styles.setInputsRow}>
-                    <View style={styles.setInputCell}>
-                      <NeonInput
-                        label="Reps"
-                        keyboardType="number-pad"
-                        value={draft.repsInput}
-                        onChangeText={(value) =>
-                          updateDraftSet(draft.id, { repsInput: value })
-                        }
-                      />
-                    </View>
-                    <View style={styles.setInputCell}>
-                      <NeonInput
-                        label="Weight"
-                        keyboardType={WEIGHT_KEYBOARD_TYPE}
-                        value={draft.weightInput}
-                        onChangeText={(value) =>
-                          updateDraftSet(draft.id, { weightInput: value })
-                        }
-                        suffix={settings.weightUnit}
-                      />
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        ))}
+                );
+              })}
+            </View>
+          );
+        })}
 
         {editError ? <ErrorNotice message={editError} /> : null}
 
         <NeonButton
-          title="Save Session Changes"
+          title={hasUnsavedChanges ? 'Save Changes' : 'No Changes'}
+          variant={hasUnsavedChanges ? 'primary' : 'ghost'}
           onPress={() => {
             void saveSessionEdits();
           }}
-          disabled={mutating}
+          disabled={mutating || !hasUnsavedChanges}
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
+    </View>
+  );
+}
+
+function CompactInput({
+  theme,
+  suffix,
+  style,
+  ...rest
+}: TextInputProps & {
+  theme: AppTheme;
+  suffix?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <View
+      style={[
+        styles.compactInput,
+        {
+          borderColor: theme.palette.border,
+          backgroundColor: theme.palette.panelSoft,
+        },
+        style,
+      ]}
+    >
+      <TextInput
+        {...rest}
+        selectTextOnFocus
+        placeholderTextColor={theme.palette.textMuted}
+        style={[styles.compactInputText, { color: theme.palette.textPrimary }]}
+      />
+      {suffix ? (
+        <AppText variant="micro" tone="muted">
+          {suffix}
+        </AppText>
+      ) : null}
     </View>
   );
 }

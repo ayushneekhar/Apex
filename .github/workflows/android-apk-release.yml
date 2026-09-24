@@ -57,6 +57,19 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # Caches ~/.gradle (wrapper, dependencies, build cache). Cache is only
+      # written from the default branch, which is where native builds run.
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # C++ (new arch, Skia, Nitro modules) dominates build time and isn't
+      # covered by the Gradle build cache — ccache it instead.
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: android-ccache-${{ inputs.build_type || 'production' }}
+          max-size: 2G
+
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
@@ -170,17 +183,36 @@ jobs:
 
       - name: Build APK
         shell: bash
+        env:
+          # Real devices only — x86/x86_64 are emulator ABIs and double the C++ work.
+          REACT_NATIVE_ARCHITECTURES: arm64-v8a,armeabi-v7a
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_SLOPPINESS: pch_defines,time_macros,include_file_mtime,include_file_ctime
+          CCACHE_COMPILERCHECK: content
         run: |
           set -euo pipefail
           BUILD_TYPE="${{ steps.version.outputs.build_type }}"
 
+          GRADLE_ARGS=(
+            --build-cache
+            --parallel
+            -PreactNativeArchitectures="${REACT_NATIVE_ARCHITECTURES}"
+            -Dorg.gradle.jvmargs="-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC"
+          )
+
+          cd android
           if [ "${BUILD_TYPE}" = "production" ]; then
             echo "Building production APK (assembleRelease)"
-            yarn android:apk:release
+            # lintVital only reports fatal lint issues; not worth ~minutes per release.
+            NODE_ENV=production ./gradlew assembleRelease -x lintVitalRelease "${GRADLE_ARGS[@]}"
           else
             echo "Building development APK (assembleDebug)"
-            yarn android:apk:debug
+            NODE_ENV=development ./gradlew assembleDebug "${GRADLE_ARGS[@]}"
           fi
+
+          ccache --show-stats || true
 
       - name: Locate APK
         id: apk

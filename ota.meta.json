@@ -1,7 +1,7 @@
 {
   "platform": "android",
   "appVersion": "1.1.1+10",
-  "otaVersion": "11",
+  "otaVersion": "12",
   "bundleName": "index.android.bundle",
-  "generatedAt": "2026-09-24T21:29:33.728Z"
+  "generatedAt": "2026-09-25T06:16:37.209Z"
 }

@@ -94,11 +94,6 @@ export const styles = StyleSheet.create({
     height: 10,
     borderRadius: radii.pill,
   },
-  calendarLegendStreak: {
-    width: 14,
-    height: 2,
-    borderRadius: radii.pill,
-  },
   calendarDayLabel: {
     fontSize: 12,
     lineHeight: 14,

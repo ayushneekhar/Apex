@@ -69,7 +69,6 @@ export const designTokens = {
     microSize: 10,
     microLineHeight: 14,
     microLetterSpacing: 0.9,
-    tabLabelLetterSpacing: 0.7,
   },
   opacity: {
     disabled: 0.45,
@@ -85,8 +84,6 @@ export const designTokens = {
     defaultLineGap: 48,
     /** Max grid travel (px) at full device tilt. */
     parallaxGridShift: 14,
-    /** Max accent-glow travel (px) at full device tilt, opposite the grid. */
-    parallaxGlowShift: 42,
   },
   overlay: {
     modalBackdrop: 'rgba(0, 0, 0, 0.58)',

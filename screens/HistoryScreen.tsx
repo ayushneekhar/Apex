@@ -106,7 +106,6 @@ function shiftCalendarMonth(monthStartTimestamp: number, deltaMonths: number): n
 function buildCalendarWeeks(
   monthStartTimestamp: number,
   dayIntensities: Map<string, number>,
-  weekRuns: WeekRuns,
   todayKey: string
 ): CalendarCell[][] {
   const firstDay = new Date(monthStartTimestamp);
@@ -122,11 +121,6 @@ function buildCalendarWeeks(
     const dateKey = toLocalDateKey(date.getTime());
     const inCurrentMonth = date.getMonth() === monthIndex;
     const isWorkoutDay = inCurrentMonth && dayIntensities.has(dateKey);
-    const runId = isWorkoutDay
-      ? weekRuns.runByWeek.get(getWeekStartTimestamp(date.getTime())) ?? null
-      : null;
-    // A single trained week isn't a streak worth drawing.
-    const streakRunId = runId !== null && weekRuns.runLengths[runId] > 1 ? runId : null;
 
     return {
       key: `${dateKey}-${cellIndex}`,
@@ -135,8 +129,6 @@ function buildCalendarWeeks(
       inCurrentMonth,
       isWorkoutDay,
       intensity: dayIntensities.get(dateKey) ?? 0,
-      streakRunId,
-      isActiveStreak: streakRunId !== null && streakRunId === weekRuns.activeRunId,
       isToday: dateKey === todayKey,
     };
   });
@@ -378,11 +370,8 @@ export default function HistoryScreen() {
 
   const currentMonthKey = toLocalMonthKey(Date.now());
   const calendarWeeks = useMemo(
-    () => buildCalendarWeeks(calendarMonthStartTimestamp, dayIntensities, weekRuns, todayKey),
-    [calendarMonthStartTimestamp, dayIntensities, todayKey, weekRuns]
-  );
-  const monthHasStreakLinks = calendarWeeks.some((week) =>
-    week.some((cell) => cell.streakRunId !== null)
+    () => buildCalendarWeeks(calendarMonthStartTimestamp, dayIntensities, todayKey),
+    [calendarMonthStartTimestamp, dayIntensities, todayKey]
   );
   const sessionsThisMonth = useMemo(
     () => rows.filter((row) => row.monthKey === currentMonthKey).length,
@@ -596,16 +585,6 @@ export default function HistoryScreen() {
 
           {rows.length > 0 ? (
             <View style={styles.calendarLegend}>
-              {monthHasStreakLinks ? (
-                <View style={styles.calendarLegendItem}>
-                  <View
-                    style={[styles.calendarLegendStreak, { backgroundColor: theme.palette.accent }]}
-                  />
-                  <AppText variant="micro" tone="muted">
-                    Streak
-                  </AppText>
-                </View>
-              ) : null}
               <View style={styles.calendarLegendItem}>
                 <AppText variant="micro" tone="muted">
                   Light

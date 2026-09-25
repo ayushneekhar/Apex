@@ -6,7 +6,6 @@ const { grid, opacity } = designTokens;
 
 export const NEON_GRID_DEFAULT_LINE_GAP = grid.defaultLineGap;
 export const NEON_GRID_PARALLAX_GRID_SHIFT = grid.parallaxGridShift;
-export const NEON_GRID_PARALLAX_GLOW_SHIFT = grid.parallaxGlowShift;
 export const NEON_GRID_WASH_OPACITY = opacity.neonWash;
 
 export const styles = StyleSheet.create({

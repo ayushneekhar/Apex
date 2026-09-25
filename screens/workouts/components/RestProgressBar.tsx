@@ -47,6 +47,9 @@ export function RestProgressBar({
 }) {
   const [canvasWidth, setCanvasWidth] = useState(0);
   const clock = useClock();
+  // Wall time when the frame clock started. The fill derives "now" from this plus
+  // the clock instead of calling Date.now() inside the worklet on the UI runtime.
+  const [clockOrigin] = useState(Date.now);
   const { endsAt, durationMs } = restTimer;
   const { accent, accentStrong, border, danger, panel, success } = theme.palette;
   const barWidth = Math.max(0, canvasWidth - REST_BAR_GLOW_PAD * 2);
@@ -60,9 +63,7 @@ export function RestProgressBar({
 
   /** Width (px) of the rested portion; the remainder is overtime. */
   const baseWidth = useDerivedValue(() => {
-    // Read the clock so this re-evaluates every frame.
-    void clock.value;
-    const now = Date.now();
+    const now = clockOrigin + clock.value;
     const overtimeMs = Math.max(0, now - endsAt);
 
     if (overtimeMs > 0) {

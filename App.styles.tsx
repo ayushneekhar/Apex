@@ -1,12 +1,13 @@
 import type { BottomTabNavigationOptions } from "@react-navigation/bottom-tabs";
 import { BlurView } from "expo-blur";
+import type { RefObject } from "react";
 import { StyleSheet, View } from "react-native";
 import type { EdgeInsets } from "react-native-safe-area-context";
 
 import type { AppTheme } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
 
-const { border, radii, sizes, spacing, typography } = designTokens;
+const { border, radii, sizes, spacing } = designTokens;
 
 export const styles = StyleSheet.create({
   root: {
@@ -34,9 +35,14 @@ export const styles = StyleSheet.create({
   },
 });
 
+/**
+ * `blurTarget` must wrap the tab scenes: on Android the blur samples that view,
+ * and without it expo-blur silently falls back to a flat translucent fill.
+ */
 export function createTabScreenOptions(
   theme: AppTheme,
-  insets: EdgeInsets
+  insets: EdgeInsets,
+  blurTarget: RefObject<View | null> | undefined
 ): BottomTabNavigationOptions {
   return {
     headerShown: false,
@@ -45,6 +51,7 @@ export function createTabScreenOptions(
     sceneStyle: {
       backgroundColor: theme.palette.background,
     },
+    tabBarShowLabel: false,
     tabBarActiveTintColor: theme.palette.accent,
     tabBarInactiveTintColor: theme.palette.textMuted,
     tabBarStyle: {
@@ -65,7 +72,8 @@ export function createTabScreenOptions(
         <BlurView
           tint={theme.statusBarStyle === "light" ? "dark" : "light"}
           intensity={40}
-          experimentalBlurMethod="dimezisBlurView"
+          blurMethod="dimezisBlurView"
+          blurTarget={blurTarget}
           style={StyleSheet.absoluteFill}
         />
         <View
@@ -78,12 +86,5 @@ export function createTabScreenOptions(
         />
       </View>
     ),
-    tabBarLabelStyle: {
-      fontFamily: "Unbounded_500Medium",
-      fontSize: typography.microSize,
-      textTransform: "uppercase",
-      letterSpacing: typography.tabLabelLetterSpacing,
-      marginBottom: spacing.xxxs,
-    },
   };
 }

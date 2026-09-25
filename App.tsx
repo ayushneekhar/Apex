@@ -15,8 +15,16 @@ import {
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
+import { BlurTargetView } from "expo-blur";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  createRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type RefObject,
+} from "react";
 import { AppState, Pressable, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -100,13 +108,28 @@ function RootTabs({
 }) {
   const insets = useSafeAreaInsets();
   const showUpdatePrompt = Boolean(updateCheck?.hasUpdate && updateCheck.isCompatible);
+  // Each scene is its own blur target; the tab bar blurs whichever one is focused.
+  // The bar can't sit inside the view it blurs, so the whole navigator can't be the target.
+  const blurTargets = useMemo(
+    () => new Map<string, RefObject<View | null>>(
+        APP_TABS.map((tab) => [tab.name, createRef<View>()])
+      ),
+    []
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.palette.background }}>
       <Tab.Navigator
         initialRouteName="Workouts"
         detachInactiveScreens={false}
-        screenOptions={createTabScreenOptions(theme, insets)}
+        screenLayout={({ children, route }) => (
+          <BlurTargetView ref={blurTargets.get(route.name)} style={styles.root}>
+            {children}
+          </BlurTargetView>
+        )}
+        screenOptions={({ route }) =>
+          createTabScreenOptions(theme, insets, blurTargets.get(route.name))
+        }
       >
         {APP_TABS.map((screen) => (
           <Tab.Screen

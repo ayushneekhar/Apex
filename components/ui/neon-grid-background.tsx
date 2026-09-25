@@ -1,10 +1,8 @@
 import {
   Canvas,
-  Circle,
   Group,
   LinearGradient,
   Path,
-  RadialGradient,
   Rect,
   Skia,
   vec,
@@ -27,7 +25,6 @@ import {
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
   NEON_GRID_DEFAULT_LINE_GAP,
-  NEON_GRID_PARALLAX_GLOW_SHIFT,
   NEON_GRID_PARALLAX_GRID_SHIFT,
   NEON_GRID_WASH_OPACITY,
   styles,
@@ -142,29 +139,10 @@ export function NeonGridBackground({ lineGap = NEON_GRID_DEFAULT_LINE_GAP }: Neo
     return path;
   }, [border.thin, height, lineGap, width]);
 
-  const glowRadius = Math.max(width, height) * 0.55;
-  const highlightRadius = Math.max(width, height) * 0.4;
-
   const gridTransform = useDerivedValue(() => [
     { translateX: tiltX.value * NEON_GRID_PARALLAX_GRID_SHIFT },
     { translateY: tiltY.value * NEON_GRID_PARALLAX_GRID_SHIFT },
   ]);
-
-  // The glow drifts against the grid, like a light source sitting above it.
-  const glowCenter = useDerivedValue(() =>
-    vec(
-      width / 2 - tiltX.value * NEON_GRID_PARALLAX_GLOW_SHIFT,
-      height * 0.16 - tiltY.value * NEON_GRID_PARALLAX_GLOW_SHIFT
-    )
-  );
-
-  // Same point, expressed in the grid's translated coordinates.
-  const highlightCenter = useDerivedValue(() =>
-    vec(
-      width / 2 - tiltX.value * (NEON_GRID_PARALLAX_GLOW_SHIFT + NEON_GRID_PARALLAX_GRID_SHIFT),
-      height * 0.16 - tiltY.value * (NEON_GRID_PARALLAX_GLOW_SHIFT + NEON_GRID_PARALLAX_GRID_SHIFT)
-    )
-  );
 
   return (
     <>
@@ -188,19 +166,8 @@ export function NeonGridBackground({ lineGap = NEON_GRID_DEFAULT_LINE_GAP }: Neo
           />
         </Rect>
 
-        <Circle c={glowCenter} r={glowRadius}>
-          <RadialGradient c={glowCenter} r={glowRadius} colors={[`${accent}1a`, `${accent}00`]} />
-        </Circle>
-
         <Group transform={gridTransform}>
           <Path path={gridPath} style="stroke" strokeWidth={border.thin} color={gridLine} />
-          <Path path={gridPath} style="stroke" strokeWidth={border.thin}>
-            <RadialGradient
-              c={highlightCenter}
-              r={highlightRadius}
-              colors={[`${accent}40`, `${accent}00`]}
-            />
-          </Path>
         </Group>
       </Canvas>
     </>

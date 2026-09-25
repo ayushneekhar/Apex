@@ -1,10 +1,13 @@
 {
-  "version": "10",
+  "version": "12",
   "isSemver": false,
   "targetVersions": {
     "ios": [
       "1.1.1+4"
     ]
   },
-  "releaseNotes": "Auto OTA from main (68bea73)"
+  "releaseNotes": "Auto OTA from main (80f1aa6)",
+  "patches": {
+    "10": "patches/10-12.zip"
+  }
 }

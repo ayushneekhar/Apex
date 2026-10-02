@@ -14,6 +14,7 @@ import {
   getWorkoutSessionVolumeKg,
   groupWorkoutSessionSets,
 } from '@/lib/workout-session';
+import { getActiveWeekStreak, getWeekRuns } from '@/lib/streaks';
 import { formatWeightFromKg, type WeightUnit } from '@/lib/weight';
 import { useAppStore } from '@/store/use-app-store';
 import type { RootStackParamList } from '@/types/navigation';
@@ -34,7 +35,6 @@ import {
 
 const WEEKDAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
 const DAYS_PER_WEEK = WEEKDAY_LABELS.length;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const HEAT_LEGEND_STEPS = [0, 0.35, 0.7, 1] as const;
 
 type SessionRowData = {
@@ -64,13 +64,6 @@ type CalendarCell = CalendarHeatCell & {
   isToday: boolean;
 };
 
-type WeekRuns = {
-  /** Week start timestamp → index of the run of consecutive trained weeks it belongs to. */
-  runByWeek: Map<number, number>;
-  runLengths: number[];
-  activeRunId: number | null;
-};
-
 function toLocalDateKey(timestamp: number): string {
   const date = new Date(timestamp);
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -91,11 +84,6 @@ function toLocalMonthKey(timestamp: number): string {
 function getMonthStartTimestamp(timestamp: number): number {
   const date = new Date(timestamp);
   return new Date(date.getFullYear(), date.getMonth(), 1).getTime();
-}
-
-function getWeekStartTimestamp(timestamp: number): number {
-  const date = new Date(timestamp);
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - date.getDay()).getTime();
 }
 
 function shiftCalendarMonth(monthStartTimestamp: number, deltaMonths: number): number {
@@ -139,36 +127,6 @@ function buildCalendarWeeks(
   }
 
   return weeks;
-}
-
-/**
- * Groups trained weeks (Sun–Sat) into runs of consecutive weeks. The active run
- * is the one containing this week, or last week — an empty current week doesn't
- * break the streak until it's over.
- */
-function getWeekRuns(performedAts: number[], now: number): WeekRuns {
-  const weeks = [...new Set(performedAts.map(getWeekStartTimestamp))].sort((a, b) => a - b);
-  const runByWeek = new Map<number, number>();
-  const runLengths: number[] = [];
-
-  weeks.forEach((week, index) => {
-    // Step via a mid-week day so DST shifts don't break the comparison.
-    const continuesRun =
-      index > 0 && getWeekStartTimestamp(weeks[index - 1] + 8 * MS_PER_DAY) === week;
-
-    if (!continuesRun) {
-      runLengths.push(0);
-    }
-
-    runLengths[runLengths.length - 1] += 1;
-    runByWeek.set(week, runLengths.length - 1);
-  });
-
-  const thisWeek = getWeekStartTimestamp(now);
-  const lastWeek = getWeekStartTimestamp(thisWeek - MS_PER_DAY);
-  const activeRunId = runByWeek.get(thisWeek) ?? runByWeek.get(lastWeek) ?? null;
-
-  return { runByWeek, runLengths, activeRunId };
 }
 
 /**
@@ -365,8 +323,7 @@ export default function HistoryScreen() {
     () => getWeekRuns(rows.map((row) => row.performedAt), Date.now()),
     [rows]
   );
-  const weekStreak =
-    weekRuns.activeRunId === null ? 0 : weekRuns.runLengths[weekRuns.activeRunId];
+  const weekStreak = getActiveWeekStreak(weekRuns);
 
   const currentMonthKey = toLocalMonthKey(Date.now());
   const calendarWeeks = useMemo(

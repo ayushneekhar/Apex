@@ -90,7 +90,8 @@ type AppStoreState = {
     reps: number,
     exerciseName?: string
   ) => Promise<void>;
-  finishActiveWorkoutSession: () => Promise<void>;
+  /** Resolves with the saved session, or null when there was nothing to finish. */
+  finishActiveWorkoutSession: () => Promise<{ workoutId: string; sessionId: string } | null>;
   discardActiveWorkoutSession: () => Promise<void>;
 };
 
@@ -1073,7 +1074,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const session = get().activeSession;
 
     if (!session) {
-      return;
+      return null;
     }
 
     set({ mutating: true, error: null });
@@ -1085,7 +1086,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         await cancelScheduledNotification(session.restTimer.notificationId).catch(() => undefined);
       }
 
-      await createWorkoutSession({
+      const sessionId = await createWorkoutSession({
         workoutId: session.workoutId,
         performedAt: finishedAt,
         durationMs: getElapsedSessionMs(session, finishedAt),
@@ -1119,6 +1120,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         activeSession: null,
         error: null,
       });
+
+      return { workoutId: session.workoutId, sessionId };
     } catch (error) {
       set({ error: errorMessage(error) });
       throw error;

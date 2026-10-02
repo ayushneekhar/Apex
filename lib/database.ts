@@ -683,7 +683,7 @@ export async function createWorkout(input: NewWorkoutInput): Promise<void> {
   });
 }
 
-export async function createWorkoutSession(input: NewWorkoutSessionInput): Promise<void> {
+export async function createWorkoutSession(input: NewWorkoutSessionInput): Promise<string> {
   const db = await getDatabase();
   const sessionId = createId('session');
 
@@ -724,6 +724,8 @@ export async function createWorkoutSession(input: NewWorkoutSessionInput): Promi
       );
     }
   });
+
+  return sessionId;
 }
 
 export async function updateWorkout(input: UpdateWorkoutInput): Promise<void> {

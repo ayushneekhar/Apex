@@ -55,6 +55,7 @@ import AnalyticsScreen from "@/screens/AnalyticsScreen";
 import HistoryScreen from "@/screens/HistoryScreen";
 import SessionDetailScreen from "@/screens/SessionDetailScreen";
 import SettingsScreen from "@/screens/SettingsScreen";
+import WorkoutSummaryScreen from "@/screens/WorkoutSummaryScreen";
 import WorkoutTemplateCreatorScreen from "@/screens/WorkoutTemplateCreatorScreen";
 import WorkoutTemplateEditorScreen from "@/screens/WorkoutTemplateEditorScreen";
 import WorkoutsScreen from "@/screens/WorkoutsScreen";
@@ -386,6 +387,14 @@ export default function App() {
               <RootStack.Screen
                 name="SessionDetails"
                 component={SessionDetailScreen}
+              />
+              <RootStack.Screen
+                name="WorkoutSummary"
+                component={WorkoutSummaryScreen}
+                options={{
+                  animation: "fade_from_bottom",
+                  gestureEnabled: false,
+                }}
               />
               <RootStack.Screen
                 name="WorkoutTemplateCreator"

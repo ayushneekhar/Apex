@@ -1,3 +1,5 @@
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo } from "react";
 import { useAnimatedStyle } from "react-native-reanimated";
 
@@ -6,13 +8,17 @@ import {
   formatWeightFromKg,
   getDefaultWeeklyIncrementKg,
 } from "@/lib/weight";
+import { getCurrentLevel } from "@/screens/workout-summary/summary-data";
 import { useAppStore } from "@/store/use-app-store";
+import type { RootStackParamList } from "@/types/navigation";
 
 import { useWorkoutSessionSetActionsController } from "./use-workout-session-set-actions-controller";
 import { useWorkoutSessionUiController } from "./use-workout-session-ui-controller";
 
 export function useWorkoutsScreenController() {
   const theme = useAppTheme();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const workouts = useAppStore((state) => state.workouts);
   const settings = useAppStore((state) => state.settings);
@@ -82,6 +88,7 @@ export function useWorkoutsScreenController() {
     now: sessionUi.now,
     setSessionActionError: sessionUi.setSessionActionError,
     closeSessionScreen: sessionUi.closeSessionScreen,
+    onSessionFinished: (result) => navigation.navigate("WorkoutSummary", result),
     decrementOrCompleteSessionSet,
     setSessionSetCustomValues,
     updateActiveSessionExerciseTargets,
@@ -101,6 +108,9 @@ export function useWorkoutsScreenController() {
       }),
     []
   );
+
+  // All workouts, archived included: retiring a template shouldn't cost XP.
+  const level = useMemo(() => getCurrentLevel(workouts), [workouts]);
 
   const compactHero = activeWorkouts.length > 0;
   const moveTrackerCardToBottom = activeWorkouts.length > 1;
@@ -173,6 +183,7 @@ export function useWorkoutsScreenController() {
     activeSession,
     sessionDateFormatter,
     defaultOverload,
+    level,
 
     ...sessionUiPublic,
     beginWorkout,

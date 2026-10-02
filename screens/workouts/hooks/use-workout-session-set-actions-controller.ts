@@ -29,6 +29,7 @@ type SessionSetActionsDeps = {
   now: number;
   setSessionActionError: (value: string | null) => void;
   closeSessionScreen: () => void;
+  onSessionFinished: (result: { workoutId: string; sessionId: string }) => void;
   decrementOrCompleteSessionSet: (
     setId: string
   ) => Promise<{
@@ -53,7 +54,7 @@ type SessionSetActionsDeps = {
     templateOrder: number;
     exercises: NewWorkoutExerciseInput[];
   }) => Promise<void>;
-  finishActiveWorkoutSession: () => Promise<void>;
+  finishActiveWorkoutSession: () => Promise<{ workoutId: string; sessionId: string } | null>;
   discardActiveWorkoutSession: () => Promise<void>;
 };
 
@@ -151,6 +152,7 @@ export function useWorkoutSessionSetActionsController({
   now,
   setSessionActionError,
   closeSessionScreen,
+  onSessionFinished,
   decrementOrCompleteSessionSet,
   setSessionSetCustomValues,
   updateActiveSessionExerciseTargets,
@@ -497,8 +499,12 @@ export function useWorkoutSessionSetActionsController({
 
   async function handleFinishSession() {
     try {
-      await finishActiveWorkoutSession();
+      const result = await finishActiveWorkoutSession();
       closeSessionScreen();
+
+      if (result) {
+        onSessionFinished(result);
+      }
     } catch {
       setSessionActionError("Could not save this workout session.");
     }

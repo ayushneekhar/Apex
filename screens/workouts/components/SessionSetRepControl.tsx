@@ -33,6 +33,10 @@ export function SessionSetRepControl({
 }) {
   const [pressed, setPressed] = useState(false);
   const [previewReps, setPreviewReps] = useState<number | null>(null);
+  // Holds the scrubbed value while the commit is in flight so the meter
+  // doesn't flash the old (or intermediate "completed at target") reps.
+  const [committingReps, setCommittingReps] = useState<number | null>(null);
+  const commitSeqRef = useRef(0);
   const scrubRef = useRef({ active: false, stepped: false, baseReps: 0, reps: 0 });
 
   // Pending sets scrub relative to the target, since "a couple short of
@@ -92,7 +96,13 @@ export function SessionSetRepControl({
         return;
       }
 
-      void controller.handleSetRepScrubCommit(setEntry, scrub.reps);
+      const commitSeq = ++commitSeqRef.current;
+      setCommittingReps(scrub.reps);
+      void controller.handleSetRepScrubCommit(setEntry, scrub.reps).finally(() => {
+        if (commitSeqRef.current === commitSeq) {
+          setCommittingReps(null);
+        }
+      });
     });
 
   const tapGesture = Gesture.Tap()
@@ -157,7 +167,7 @@ export function SessionSetRepControl({
         <SetRepMeter
           theme={theme}
           setNumber={setEntry.setNumber}
-          actualReps={previewReps ?? setEntry.actualReps}
+          actualReps={previewReps ?? committingReps ?? setEntry.actualReps}
           targetReps={setEntry.targetReps}
           previousReps={setEntry.previousReps}
         />

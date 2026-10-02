@@ -1,13 +1,14 @@
 {
-  "version": "12",
+  "version": "13",
   "isSemver": false,
   "targetVersions": {
     "android": [
       "1.1.1+10"
     ]
   },
-  "releaseNotes": "Auto OTA from main (80f1aa6)",
+  "releaseNotes": "Auto OTA from main (8b89f76)",
   "patches": {
-    "11": "patches/11-12.zip"
+    "11": "patches/11-13.zip",
+    "12": "patches/12-13.zip"
   }
 }

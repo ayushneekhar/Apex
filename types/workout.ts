@@ -20,6 +20,14 @@ export type WorkoutSessionSet = {
   setNumber: number;
   reps: number;
   weightKg: number;
+  /** Warm-ups are kept for the log but left out of volume, PRs and XP. */
+  isWarmup: boolean;
+};
+
+export type WorkoutSessionExerciseNote = {
+  workoutExerciseId: string;
+  exerciseName: string;
+  note: string;
 };
 
 export type WorkoutSession = {
@@ -29,6 +37,7 @@ export type WorkoutSession = {
   durationMs: number | null;
   bodyweightKg: number | null;
   sets: WorkoutSessionSet[];
+  exerciseNotes: WorkoutSessionExerciseNote[];
 };
 
 export type Workout = {
@@ -71,6 +80,7 @@ export type NewWorkoutSessionSetInput = {
   setNumber: number;
   reps: number;
   weightKg: number;
+  isWarmup?: boolean;
 };
 
 export type NewWorkoutSessionInput = {
@@ -79,6 +89,7 @@ export type NewWorkoutSessionInput = {
   durationMs?: number | null;
   bodyweightKg?: number | null;
   sets: NewWorkoutSessionSetInput[];
+  exerciseNotes?: WorkoutSessionExerciseNote[];
 };
 
 export type UpdateWorkoutSessionInput = {
@@ -109,6 +120,7 @@ export type ActiveWorkoutSet = {
   actualReps: number;
   supersetExerciseId: string | null;
   completedAt: number | null;
+  isWarmup: boolean;
 };
 
 export type ActiveRestTimer = {
@@ -132,4 +144,6 @@ export type ActiveWorkoutSession = {
   currentExerciseId: string | null;
   restTimer: ActiveRestTimer | null;
   sets: ActiveWorkoutSet[];
+  /** Note text keyed by workoutExerciseId. */
+  exerciseNotes: Record<string, string>;
 };

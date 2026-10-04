@@ -8,10 +8,12 @@ import { NeonGridBackground } from '@/components/ui/neon-grid-background';
 import { designTokens } from '@/constants/design-system';
 
 import type { WorkoutsScreenController } from '../hooks/use-workouts-screen-controller';
+import { AddExerciseModal } from './AddExerciseModal';
 import { DiscardSessionModal } from './DiscardSessionModal';
 import { EditCustomSetModal } from './EditCustomSetModal';
 import { EditExerciseModal } from './EditExerciseModal';
 import { ErrorNotice } from './common/ErrorNotice';
+import { ExerciseNoteModal } from './ExerciseNoteModal';
 import { SessionExerciseList } from './SessionExerciseList';
 import { SessionFooterActions } from './SessionFooterActions';
 import { SessionSummaryCard } from './SessionSummaryCard';
@@ -107,6 +109,8 @@ export function ActiveSessionOverlay({
 
       <EditCustomSetModal controller={controller} />
       <EditExerciseModal controller={controller} />
+      <ExerciseNoteModal controller={controller} />
+      <AddExerciseModal controller={controller} />
       <DiscardSessionModal controller={controller} />
     </Animated.View>
   );

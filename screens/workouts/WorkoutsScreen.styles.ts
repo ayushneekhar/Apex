@@ -15,8 +15,4 @@ export const styles = StyleSheet.create({
     paddingHorizontal: layout.screenHorizontalInset,
     gap: spacing.xl,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
 });

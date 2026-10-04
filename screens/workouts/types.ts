@@ -23,7 +23,9 @@ export type ActiveSetGroup = {
   restSeconds: number;
   supersetExerciseId: string | null;
   supersetExerciseName: string | null;
+  /** Working sets only; warm-ups live in `warmupSets`. */
   sets: ActiveWorkoutSet[];
+  warmupSets: ActiveWorkoutSet[];
 };
 
 export type CustomSetEditMode = 'reps' | 'weight';

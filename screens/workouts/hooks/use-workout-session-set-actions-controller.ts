@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { EXERCISE_LIBRARY } from "@/constants/exercise-library";
+import { QUICK_WORKOUT_ID } from "@/constants/workout";
 
 import {
   triggerLightImpactHaptic,
@@ -188,7 +189,8 @@ export function useWorkoutSessionSetActionsController({
     () =>
       activeSession?.sets
         .filter(
-          (setEntry) => setEntry.workoutExerciseId === exerciseEditorExerciseId
+          (setEntry) =>
+            setEntry.workoutExerciseId === exerciseEditorExerciseId && !setEntry.isWarmup
         )
         .sort((a, b) => a.setNumber - b.setNumber) ?? [],
     [activeSession?.sets, exerciseEditorExerciseId]
@@ -200,6 +202,19 @@ export function useWorkoutSessionSetActionsController({
         : null,
     [activeSession, workouts]
   );
+  // Exercises added mid-session (or in a quick workout) have no template row to update.
+  // Matched by id or name, the same way saving to the template finds the exercise.
+  const exerciseEditorInTemplate = useMemo(() => {
+    const selectedName = exerciseEditorSets[0]?.exerciseName.trim().toLowerCase() ?? "";
+
+    return (
+      exerciseEditorWorkout?.exercises.some(
+        (exercise) =>
+          exercise.id === exerciseEditorExerciseId ||
+          exercise.name.trim().toLowerCase() === selectedName
+      ) ?? false
+    );
+  }, [exerciseEditorExerciseId, exerciseEditorSets, exerciseEditorWorkout]);
   const exerciseEditorFilteredLibrary = useMemo(() => {
     const query = exerciseEditorNameInput.trim().toLowerCase();
 
@@ -260,7 +275,9 @@ export function useWorkoutSessionSetActionsController({
 
   function openExerciseEditor(workoutExerciseId: string) {
     const selectedSets = activeSession?.sets
-      .filter((setEntry) => setEntry.workoutExerciseId === workoutExerciseId)
+      .filter(
+        (setEntry) => setEntry.workoutExerciseId === workoutExerciseId && !setEntry.isWarmup
+      )
       .sort((a, b) => a.setNumber - b.setNumber);
 
     if (!selectedSets || selectedSets.length === 0) {
@@ -498,6 +515,16 @@ export function useWorkoutSessionSetActionsController({
   }
 
   async function handleFinishSession() {
+    const hasLoggedSet =
+      activeSession?.sets.some((setEntry) => !setEntry.isWarmup && setEntry.actualReps > 0) ??
+      false;
+
+    // A template session is a plan worth recording even if skipped; an empty quick one isn't.
+    if (activeSession?.workoutId === QUICK_WORKOUT_ID && !hasLoggedSet) {
+      setSessionActionError("Log at least one set before finishing, or delete this workout.");
+      return;
+    }
+
     try {
       const result = await finishActiveWorkoutSession();
       closeSessionScreen();
@@ -550,6 +577,7 @@ export function useWorkoutSessionSetActionsController({
     exerciseEditorSets,
     exerciseEditorNameInput,
     exerciseEditorFilteredLibrary,
+    exerciseEditorInTemplate,
     exerciseEditorSetsInput,
     exerciseEditorRepsInput,
     exerciseEditorError,

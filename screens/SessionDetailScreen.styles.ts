@@ -65,6 +65,14 @@ export const styles = StyleSheet.create({
   bodyweightInput: {
     width: 110,
   },
+  noteLine: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+  },
+  noteText: {
+    flex: 1,
+  },
   exerciseCard: {
     borderWidth: border.thin,
     borderRadius: radii.panel,

@@ -63,4 +63,8 @@ export const styles = StyleSheet.create({
   modalScrollContent: {
     gap: spacing.lg,
   },
+  noteInput: {
+    minHeight: 88,
+    textAlignVertical: "top",
+  },
 });

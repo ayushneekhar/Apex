@@ -9,8 +9,9 @@ import {
   getWeekRuns,
   getWeekStartTimestamp,
 } from '@/lib/streaks';
+import { QUICK_WORKOUT_ID } from '@/constants/workout';
 import type { WeightUnit } from '@/lib/weight';
-import { getWorkoutSessionVolumeKg } from '@/lib/workout-session';
+import { getWorkingSets, getWorkoutSessionVolumeKg } from '@/lib/workout-session';
 import type { Workout, WorkoutSession } from '@/types/workout';
 
 export const STREAK_WEEKS_SHOWN = 8;
@@ -55,7 +56,7 @@ export type WorkoutSummary = {
 };
 
 function getSessionXp(session: WorkoutSession, prCount: number): number {
-  const completedSets = session.sets.filter((setEntry) => setEntry.reps > 0).length;
+  const completedSets = getWorkingSets(session.sets).filter((setEntry) => setEntry.reps > 0).length;
 
   return (
     completedSets * XP_PER_SET +
@@ -150,7 +151,8 @@ export function buildWorkoutSummary(
   const xpBefore = sumSessionXp(earlierSessions, prCountBySession);
   const xpEarned = getSessionXp(session, prs.length);
 
-  const previousSession = workout.sessions
+  // Quick workouts vary every time, so comparing them to each other means nothing.
+  const previousSession = workout.id === QUICK_WORKOUT_ID ? undefined : workout.sessions
     .filter((candidate) => candidate.id !== session.id && candidate.performedAt <= session.performedAt)
     .sort((a, b) => b.performedAt - a.performedAt)[0];
   const volumeKg = getWorkoutSessionVolumeKg(session);
@@ -161,7 +163,8 @@ export function buildWorkoutSummary(
   const sessionWeek = getWeekStartTimestamp(session.performedAt);
   const trainedWeeks = new Set(weekRuns.runByWeek.keys());
 
-  const completedSets = session.sets.filter((setEntry) => setEntry.reps > 0);
+  const workingSets = getWorkingSets(session.sets);
+  const completedSets = workingSets.filter((setEntry) => setEntry.reps > 0);
 
   return {
     workoutName: workout.name,
@@ -171,7 +174,7 @@ export function buildWorkoutSummary(
     volumeDeltaPct:
       previousVolumeKg > 0 ? ((volumeKg - previousVolumeKg) / previousVolumeKg) * 100 : null,
     completedSets: completedSets.length,
-    plannedSets: session.sets.length,
+    plannedSets: workingSets.length,
     totalReps: completedSets.reduce((total, setEntry) => total + setEntry.reps, 0),
     weekStreak: getActiveWeekStreak(weekRuns),
     streakGrew: !earlierPerformedAts.some(

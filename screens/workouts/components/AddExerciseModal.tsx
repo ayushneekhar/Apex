@@ -5,26 +5,27 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { NeonInput } from "@/components/ui/neon-input";
 import { designTokens } from "@/constants/design-system";
 
+import { WEIGHT_KEYBOARD_TYPE } from "../constants";
 import type { WorkoutsScreenController } from "../hooks/use-workouts-screen-controller";
 import { ErrorNotice } from "./common/ErrorNotice";
 import { styles } from "./SessionModal.styles";
 
 const { opacity } = designTokens;
 
-export function EditExerciseModal({
+export function AddExerciseModal({
   controller,
 }: {
   controller: WorkoutsScreenController;
 }) {
   const { theme } = controller;
-  const selectedExerciseName = controller.exerciseEditorNameInput.trim().toLowerCase();
+  const selectedExerciseName = controller.addExerciseNameInput.trim().toLowerCase();
 
   return (
     <Modal
-      visible={controller.exerciseEditorExerciseId !== null}
+      visible={controller.isAddExerciseOpen}
       transparent
       animationType="fade"
-      onRequestClose={controller.closeExerciseEditor}
+      onRequestClose={controller.closeAddExercise}
     >
       <View style={styles.backdrop}>
         <View
@@ -39,37 +40,32 @@ export function EditExerciseModal({
         >
           <ScrollView
             bounces={false}
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.modalScrollContent}
           >
-            <AppText variant="heading">Edit Exercise</AppText>
-            <AppText tone="muted">
-              Change the exercise, sets, and target reps for this session, or push the same change into the template for future workouts.
-            </AppText>
+            <AppText variant="heading">Add Exercise</AppText>
 
             <NeonInput
               label="Exercise"
               placeholder="Bench Press"
-              value={controller.exerciseEditorNameInput}
+              value={controller.addExerciseNameInput}
               onChangeText={(value) => {
-                controller.setExerciseEditorNameInput(value);
-                controller.clearExerciseEditorError();
+                controller.setAddExerciseNameInput(value);
+                controller.clearAddExerciseError();
               }}
             />
 
             <View style={styles.exerciseChipContainer}>
-              {controller.exerciseEditorFilteredLibrary.length === 0 ? (
-                <AppText tone="muted">No matching exercises in the library.</AppText>
-              ) : null}
-              {controller.exerciseEditorFilteredLibrary.map((exerciseName) => {
+              {controller.addExerciseFilteredLibrary.map((exerciseName) => {
                 const selected = selectedExerciseName === exerciseName.toLowerCase();
 
                 return (
                   <Pressable
                     key={exerciseName}
                     onPress={() => {
-                      controller.setExerciseEditorNameInput(exerciseName);
-                      controller.clearExerciseEditorError();
+                      controller.setAddExerciseNameInput(exerciseName);
+                      controller.clearAddExerciseError();
                     }}
                     style={({ pressed }) => [
                       styles.exerciseChip,
@@ -95,48 +91,50 @@ export function EditExerciseModal({
                 <NeonInput
                   label="Sets"
                   keyboardType="number-pad"
-                  value={controller.exerciseEditorSetsInput}
+                  value={controller.addExerciseSetsInput}
                   onChangeText={(value) => {
-                    controller.setExerciseEditorSetsInput(value);
-                    controller.clearExerciseEditorError();
+                    controller.setAddExerciseSetsInput(value);
+                    controller.clearAddExerciseError();
                   }}
                 />
               </View>
-
               <View style={styles.fieldCell}>
                 <NeonInput
                   label="Reps"
                   keyboardType="number-pad"
-                  value={controller.exerciseEditorRepsInput}
+                  value={controller.addExerciseRepsInput}
                   onChangeText={(value) => {
-                    controller.setExerciseEditorRepsInput(value);
-                    controller.clearExerciseEditorError();
+                    controller.setAddExerciseRepsInput(value);
+                    controller.clearAddExerciseError();
+                  }}
+                />
+              </View>
+              <View style={styles.fieldCell}>
+                <NeonInput
+                  label="Weight"
+                  keyboardType={WEIGHT_KEYBOARD_TYPE}
+                  placeholder="Last"
+                  suffix={controller.settings.weightUnit}
+                  value={controller.addExerciseWeightInput}
+                  onChangeText={(value) => {
+                    controller.setAddExerciseWeightInput(value);
+                    controller.clearAddExerciseError();
                   }}
                 />
               </View>
             </View>
 
-            {controller.exerciseEditorError ? (
-              <ErrorNotice message={controller.exerciseEditorError} />
+            {controller.addExerciseError ? (
+              <ErrorNotice message={controller.addExerciseError} />
             ) : null}
 
-            <View style={styles.actionStack}>
-              <NeonButton
-                title="Just This Workout"
-                onPress={() => void controller.saveExerciseEditorValues("session")}
-              />
-              {controller.exerciseEditorInTemplate ? (
-                <NeonButton
-                  title="Update Template Too"
-                  variant="ghost"
-                  onPress={() => void controller.saveExerciseEditorValues("template")}
-                />
-              ) : null}
-              <NeonButton
-                title="Cancel"
-                variant="ghost"
-                onPress={controller.closeExerciseEditor}
-              />
+            <View style={styles.actions}>
+              <View style={styles.actionCell}>
+                <NeonButton title="Cancel" variant="ghost" onPress={controller.closeAddExercise} />
+              </View>
+              <View style={styles.actionCell}>
+                <NeonButton title="Add" onPress={() => void controller.saveAddExercise()} />
+              </View>
             </View>
           </ScrollView>
         </View>

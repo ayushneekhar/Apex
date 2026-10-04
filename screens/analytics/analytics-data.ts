@@ -60,7 +60,7 @@ export function buildExerciseHistories(workouts: Workout[]): ExerciseHistory[] {
       const grouped = new Map<string, typeof session.sets>();
 
       session.sets.forEach((setEntry) => {
-        if (setEntry.reps <= 0) {
+        if (setEntry.reps <= 0 || setEntry.isWarmup) {
           return;
         }
 

@@ -17,10 +17,12 @@ const FILL_DURATION_MS = 280;
 
 type SetRepMeterProps = {
   theme: AppTheme;
-  setNumber: number;
+  /** Top label, e.g. "Set 2" or "W1". */
+  label: string;
   actualReps: number;
   targetReps: number;
-  previousReps: number | null;
+  /** Omit to hide the "Prev" line entirely (warm-ups have no history to show). */
+  previousReps?: number | null;
 };
 
 function getFillFraction(actualReps: number, targetReps: number): number {
@@ -36,7 +38,7 @@ function getFillFraction(actualReps: number, targetReps: number): number {
 }
 
 function SetRepMeterLabels({
-  setNumber,
+  label,
   actualReps,
   targetReps,
   previousReps,
@@ -48,7 +50,7 @@ function SetRepMeterLabels({
   return (
     <>
       <AppText variant="micro" tone={mutedTone} style={inverse ? styles.inverseMuted : null}>
-        Set {setNumber}
+        {label}
       </AppText>
       <AppText variant="heading" tone={inverse ? 'inverse' : completed ? 'accent' : 'primary'}>
         {completed ? actualReps : '--'}
@@ -56,9 +58,11 @@ function SetRepMeterLabels({
       <AppText variant="micro" tone={mutedTone} style={inverse ? styles.inverseMuted : null}>
         / {targetReps}
       </AppText>
-      <AppText variant="micro" tone={mutedTone} style={inverse ? styles.inverseMuted : null}>
-        Prev {previousReps ?? '--'}
-      </AppText>
+      {previousReps !== undefined ? (
+        <AppText variant="micro" tone={mutedTone} style={inverse ? styles.inverseMuted : null}>
+          Prev {previousReps ?? '--'}
+        </AppText>
+      ) : null}
     </>
   );
 }

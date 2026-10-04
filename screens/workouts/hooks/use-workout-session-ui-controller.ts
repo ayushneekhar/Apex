@@ -24,6 +24,7 @@ type SessionUiDeps = {
   weightUnit: WeightUnit;
   clearStoreError: () => void;
   startWorkoutSession: (workoutId: string) => Promise<void>;
+  startEmptyWorkoutSession: () => Promise<void>;
   setActiveWorkoutBodyweight: (bodyweightKg: number | null) => Promise<void>;
   pauseActiveWorkoutSession: () => Promise<void>;
   resumeActiveWorkoutSession: () => Promise<void>;
@@ -34,6 +35,7 @@ export function useWorkoutSessionUiController({
   weightUnit,
   clearStoreError,
   startWorkoutSession,
+  startEmptyWorkoutSession,
   setActiveWorkoutBodyweight,
   pauseActiveWorkoutSession,
   resumeActiveWorkoutSession,
@@ -98,7 +100,7 @@ export function useWorkoutSessionUiController({
 
   const completedSetCount = useMemo(
     () =>
-      activeSession?.sets.filter((setEntry) => setEntry.actualReps > 0)
+      activeSession?.sets.filter((setEntry) => !setEntry.isWarmup && setEntry.actualReps > 0)
         .length ?? 0,
     [activeSession?.sets]
   );
@@ -107,7 +109,9 @@ export function useWorkoutSessionUiController({
     () =>
       activeSession?.sets.reduce(
         (total, setEntry) =>
-          total + Math.abs(setEntry.actualWeightKg) * setEntry.actualReps,
+          setEntry.isWarmup
+            ? total
+            : total + Math.abs(setEntry.actualWeightKg) * setEntry.actualReps,
         0
       ) ?? 0,
     [activeSession?.sets]
@@ -241,6 +245,25 @@ export function useWorkoutSessionUiController({
     }
   }
 
+  async function beginEmptyWorkout() {
+    setSessionActionError(null);
+    clearStoreError();
+
+    if (activeSession) {
+      setSessionActionError(
+        "Finish or discard your active workout session before starting another."
+      );
+      return;
+    }
+
+    try {
+      await startEmptyWorkoutSession();
+      setIsSessionScreenOpen(true);
+    } catch {
+      setSessionActionError("Could not start a workout right now. Try again.");
+    }
+  }
+
   async function toggleSessionPaused() {
     if (!activeSession) {
       return;
@@ -290,6 +313,7 @@ export function useWorkoutSessionUiController({
     sessionHeaderDetailsAnimatedStyle,
 
     beginWorkout,
+    beginEmptyWorkout,
     toggleSessionPaused,
   };
 }

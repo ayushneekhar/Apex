@@ -36,7 +36,14 @@ export function SavedWorkoutsSection({
           </View>
           <NeonButton title="Open" onPress={controller.openSessionScreen} />
         </View>
-      ) : null}
+      ) : (
+        <NeonButton
+          title="Start empty workout"
+          variant="ghost"
+          onPress={() => void controller.beginEmptyWorkout()}
+          disabled={controller.mutating}
+        />
+      )}
 
       <View style={styles.sectionHeader}>
         <AppText variant="heading">Saved Workouts</AppText>

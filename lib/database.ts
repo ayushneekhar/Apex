@@ -6,7 +6,7 @@ import {
   type SQLiteDatabase,
 } from 'expo-sqlite';
 
-import { DEFAULT_REST_SECONDS } from '@/constants/workout';
+import { DEFAULT_REST_SECONDS, QUICK_WORKOUT_ID, QUICK_WORKOUT_NAME } from '@/constants/workout';
 import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@/constants/app-themes';
 import { createId } from '@/lib/id';
 import { DEFAULT_WEIGHT_UNIT, isWeightUnit, type WeightUnit } from '@/lib/weight';
@@ -20,6 +20,7 @@ import type {
   Workout,
   WorkoutExercise,
   WorkoutSession,
+  WorkoutSessionExerciseNote,
   WorkoutSessionSet,
 } from '@/types/workout';
 
@@ -70,6 +71,14 @@ type WorkoutSessionSetRow = {
   set_number: number;
   reps: number;
   weight_kg: number;
+  is_warmup: number;
+};
+
+type WorkoutSessionExerciseNoteRow = {
+  session_id: string;
+  workout_exercise_id: string;
+  exercise_name: string;
+  note: string;
 };
 
 type ActiveWorkoutSessionRow = {
@@ -200,6 +209,15 @@ export async function initializeDatabase(): Promise<void> {
       FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS workout_session_exercise_notes (
+      id TEXT PRIMARY KEY NOT NULL,
+      session_id TEXT NOT NULL,
+      workout_exercise_id TEXT NOT NULL,
+      exercise_name TEXT NOT NULL,
+      note TEXT NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS active_workout_session (
       id INTEGER PRIMARY KEY NOT NULL CHECK (id = 1),
       payload TEXT NOT NULL,
@@ -214,6 +232,9 @@ export async function initializeDatabase(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_workout_session_sets_session_id_set_number
       ON workout_session_sets(session_id, set_number ASC);
+
+    CREATE INDEX IF NOT EXISTS idx_workout_session_exercise_notes_session_id
+      ON workout_session_exercise_notes(session_id);
   `);
 
   const sessionTableColumns = await db.getAllAsync<{ name: string }>('PRAGMA table_info(workout_sessions);');
@@ -226,6 +247,17 @@ export async function initializeDatabase(): Promise<void> {
 
   if (!hasDurationColumn) {
     await db.execAsync('ALTER TABLE workout_sessions ADD COLUMN duration_ms INTEGER;');
+  }
+
+  const sessionSetTableColumns = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(workout_session_sets);'
+  );
+  const hasWarmupColumn = sessionSetTableColumns.some((column) => column.name === 'is_warmup');
+
+  if (!hasWarmupColumn) {
+    await db.execAsync(
+      'ALTER TABLE workout_session_sets ADD COLUMN is_warmup INTEGER NOT NULL DEFAULT 0;'
+    );
   }
 
   const exerciseTableColumns = await db.getAllAsync<{ name: string }>(
@@ -373,8 +405,22 @@ function normalizeActiveWorkoutSession(value: unknown): ActiveWorkoutSession | n
           : DEFAULT_REST_SECONDS,
       supersetExerciseId:
         typeof set.supersetExerciseId === 'string' ? set.supersetExerciseId : null,
+      isWarmup: set.isWarmup === true,
     })),
+    exerciseNotes: normalizeExerciseNotes(session.exerciseNotes),
   };
+}
+
+function normalizeExerciseNotes(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string'
+    )
+  );
 }
 
 export async function loadActiveWorkoutSession(): Promise<ActiveWorkoutSession | null> {
@@ -469,7 +515,7 @@ export async function saveWeightUnitSetting(unit: WeightUnit): Promise<void> {
 export async function listWorkouts(): Promise<Workout[]> {
   const db = await getDatabase();
 
-  const [workoutRows, exerciseRows, sessionRows, sessionSetRows] = await Promise.all([
+  const [workoutRows, exerciseRows, sessionRows, sessionSetRows, noteRows] = await Promise.all([
     db.getAllAsync<WorkoutRow>(
       `
         SELECT id, name, template_order, created_at, weeks_completed, archived_at
@@ -515,9 +561,16 @@ export async function listWorkouts(): Promise<Workout[]> {
           exercise_name,
           set_number,
           reps,
-          weight_kg
+          weight_kg,
+          is_warmup
         FROM workout_session_sets
         ORDER BY set_number ASC;
+      `
+    ),
+    db.getAllAsync<WorkoutSessionExerciseNoteRow>(
+      `
+        SELECT session_id, workout_exercise_id, exercise_name, note
+        FROM workout_session_exercise_notes;
       `
     ),
   ]);
@@ -559,6 +612,7 @@ export async function listWorkouts(): Promise<Workout[]> {
       setNumber: row.set_number,
       reps: row.reps,
       weightKg: row.weight_kg,
+      isWarmup: row.is_warmup === 1,
     };
 
     const existing = sessionSetMap.get(row.session_id);
@@ -568,6 +622,24 @@ export async function listWorkouts(): Promise<Workout[]> {
     }
 
     sessionSetMap.set(row.session_id, [mapped]);
+  });
+
+  const noteMap = new Map<string, WorkoutSessionExerciseNote[]>();
+
+  noteRows.forEach((row) => {
+    const mapped: WorkoutSessionExerciseNote = {
+      workoutExerciseId: row.workout_exercise_id,
+      exerciseName: row.exercise_name,
+      note: row.note,
+    };
+
+    const existing = noteMap.get(row.session_id);
+    if (existing) {
+      existing.push(mapped);
+      return;
+    }
+
+    noteMap.set(row.session_id, [mapped]);
   });
 
   const sessionMap = new Map<string, WorkoutSession[]>();
@@ -583,6 +655,7 @@ export async function listWorkouts(): Promise<Workout[]> {
           : null,
       bodyweightKg: row.bodyweight_kg,
       sets: sessionSetMap.get(row.id) ?? [],
+      exerciseNotes: noteMap.get(row.id) ?? [],
     };
 
     const existing = sessionMap.get(row.workout_id);
@@ -710,9 +783,10 @@ export async function createWorkoutSession(input: NewWorkoutSessionInput): Promi
             exercise_name,
             set_number,
             reps,
-            weight_kg
+            weight_kg,
+            is_warmup
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?);
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?);
         `,
         createId('session_set'),
         sessionId,
@@ -720,7 +794,28 @@ export async function createWorkoutSession(input: NewWorkoutSessionInput): Promi
         set.exerciseName,
         set.setNumber,
         set.reps,
-        set.weightKg
+        set.weightKg,
+        set.isWarmup ? 1 : 0
+      );
+    }
+
+    for (const note of input.exerciseNotes ?? []) {
+      await db.runAsync(
+        `
+          INSERT INTO workout_session_exercise_notes (
+            id,
+            session_id,
+            workout_exercise_id,
+            exercise_name,
+            note
+          )
+          VALUES (?, ?, ?, ?, ?);
+        `,
+        createId('session_note'),
+        sessionId,
+        note.workoutExerciseId,
+        note.exerciseName,
+        note.note
       );
     }
   });
@@ -862,9 +957,10 @@ export async function updateWorkoutSession(input: UpdateWorkoutSessionInput): Pr
             exercise_name,
             set_number,
             reps,
-            weight_kg
+            weight_kg,
+            is_warmup
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?);
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?);
         `,
         createId('session_set'),
         input.sessionId,
@@ -872,10 +968,28 @@ export async function updateWorkoutSession(input: UpdateWorkoutSessionInput): Pr
         set.exerciseName,
         set.setNumber,
         set.reps,
-        set.weightKg
+        set.weightKg,
+        set.isWarmup ? 1 : 0
       );
     }
   });
+}
+
+/** Creates the hidden workout that empty sessions are logged under, if it's missing. */
+export async function ensureQuickWorkout(): Promise<void> {
+  const db = await getDatabase();
+  const now = Date.now();
+
+  await db.runAsync(
+    `
+      INSERT OR IGNORE INTO workouts (id, name, template_order, created_at, weeks_completed, archived_at)
+      VALUES (?, ?, 0, ?, 0, ?);
+    `,
+    QUICK_WORKOUT_ID,
+    QUICK_WORKOUT_NAME,
+    now,
+    now
+  );
 }
 
 export async function advanceWorkoutWeek(workoutId: string): Promise<void> {

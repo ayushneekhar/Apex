@@ -8,10 +8,17 @@ import {
   formatWeightFromKg,
   getDefaultWeeklyIncrementKg,
 } from "@/lib/weight";
+import {
+  getActiveWeekStreak,
+  getWeekRuns,
+  getWeekStartTimestamp,
+} from "@/lib/streaks";
+import { QUICK_WORKOUT_ID } from "@/constants/workout";
 import { getCurrentLevel } from "@/screens/workout-summary/summary-data";
 import { useAppStore } from "@/store/use-app-store";
 import type { RootStackParamList } from "@/types/navigation";
 
+import { useSessionExerciseExtrasController } from "./use-session-exercise-extras-controller";
 import { useWorkoutSessionSetActionsController } from "./use-workout-session-set-actions-controller";
 import { useWorkoutSessionUiController } from "./use-workout-session-ui-controller";
 
@@ -31,6 +38,13 @@ export function useWorkoutsScreenController() {
   const archiveWorkout = useAppStore((state) => state.archiveWorkout);
 
   const startWorkoutSession = useAppStore((state) => state.startWorkoutSession);
+  const startEmptyWorkoutSession = useAppStore((state) => state.startEmptyWorkoutSession);
+  const addActiveSessionExercise = useAppStore((state) => state.addActiveSessionExercise);
+  const addWarmupSet = useAppStore((state) => state.addWarmupSet);
+  const removeWarmupSet = useAppStore((state) => state.removeWarmupSet);
+  const setActiveSessionExerciseNote = useAppStore(
+    (state) => state.setActiveSessionExerciseNote
+  );
   const setActiveWorkoutBodyweight = useAppStore(
     (state) => state.setActiveWorkoutBodyweight
   );
@@ -58,7 +72,10 @@ export function useWorkoutsScreenController() {
   const editWorkout = useAppStore((state) => state.editWorkout);
 
   const activeWorkouts = useMemo(
-    () => workouts.filter((workout) => workout.archivedAt === null),
+    () =>
+      workouts.filter(
+        (workout) => workout.archivedAt === null && workout.id !== QUICK_WORKOUT_ID
+      ),
     [workouts]
   );
 
@@ -76,6 +93,7 @@ export function useWorkoutsScreenController() {
     weightUnit: settings.weightUnit,
     clearStoreError: clearError,
     startWorkoutSession,
+    startEmptyWorkoutSession,
     setActiveWorkoutBodyweight,
     pauseActiveWorkoutSession,
     resumeActiveWorkoutSession,
@@ -97,6 +115,19 @@ export function useWorkoutsScreenController() {
     discardActiveWorkoutSession,
   });
 
+  const sessionExerciseExtras = useSessionExerciseExtrasController({
+    activeSession,
+    workouts,
+    weightUnit: settings.weightUnit,
+    setSessionActionError: sessionUi.setSessionActionError,
+    addActiveSessionExercise,
+    addWarmupSet,
+    removeWarmupSet,
+    setActiveSessionExerciseNote,
+  });
+
+  const isQuickSession = activeSession?.workoutId === QUICK_WORKOUT_ID;
+
   const { now: _sessionNow, ...sessionUiPublic } = sessionUi;
 
   const sessionDateFormatter = useMemo(
@@ -111,6 +142,18 @@ export function useWorkoutsScreenController() {
 
   // All workouts, archived included: retiring a template shouldn't cost XP.
   const level = useMemo(() => getCurrentLevel(workouts), [workouts]);
+  // Keyed on the week, not the ticking clock, so it only recomputes when a week rolls over.
+  const currentWeekStart = getWeekStartTimestamp(sessionUi.now);
+  const weekStreak = useMemo(
+    () =>
+      getActiveWeekStreak(
+        getWeekRuns(
+          workouts.flatMap((workout) => workout.sessions.map((session) => session.performedAt)),
+          currentWeekStart
+        )
+      ),
+    [currentWeekStart, workouts]
+  );
 
   const compactHero = activeWorkouts.length > 0;
   const moveTrackerCardToBottom = activeWorkouts.length > 1;
@@ -184,11 +227,14 @@ export function useWorkoutsScreenController() {
     sessionDateFormatter,
     defaultOverload,
     level,
+    weekStreak,
 
     ...sessionUiPublic,
     beginWorkout,
 
     ...sessionSetActions,
+    ...sessionExerciseExtras,
+    isQuickSession,
     compactHero,
     moveTrackerCardToBottom,
     orderedWorkouts,

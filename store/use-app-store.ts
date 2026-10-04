@@ -8,6 +8,7 @@ import {
   clearActiveWorkoutSession,
   createWorkout,
   createWorkoutSession,
+  ensureQuickWorkout,
   exportDatabaseBackup,
   importDatabaseBackupBytes,
   importDatabaseBackup,
@@ -24,6 +25,12 @@ import {
 } from '@/lib/database';
 import { createId } from '@/lib/id';
 import {
+  DEFAULT_REST_SECONDS,
+  QUICK_WORKOUT_ID,
+  QUICK_WORKOUT_NAME,
+  WARMUP_RAMP,
+} from '@/constants/workout';
+import {
   cancelScheduledNotification,
   createRestNotificationId,
   requestRestNotificationPermission,
@@ -31,7 +38,7 @@ import {
   syncRestCompleteNotification,
 } from '@/lib/rest-notifications';
 import type { NitroOtaUpdateCheck } from '@/lib/nitro-ota';
-import type { WeightUnit } from '@/lib/weight';
+import { convertKgToUnit, convertUnitToKg, type WeightUnit } from '@/lib/weight';
 import type {
   ActiveRestTimer,
   ActiveWorkoutSession,
@@ -71,6 +78,16 @@ type AppStoreState = {
   archiveWorkout: (workoutId: string) => Promise<void>;
   restoreWorkout: (workoutId: string) => Promise<void>;
   startWorkoutSession: (workoutId: string) => Promise<void>;
+  startEmptyWorkoutSession: () => Promise<void>;
+  addActiveSessionExercise: (input: {
+    name: string;
+    sets: number;
+    reps: number;
+    weightKg: number | null;
+  }) => Promise<void>;
+  addWarmupSet: (workoutExerciseId: string, unit: WeightUnit) => Promise<void>;
+  removeWarmupSet: (setId: string) => Promise<void>;
+  setActiveSessionExerciseNote: (workoutExerciseId: string, note: string) => Promise<void>;
   setActiveWorkoutBodyweight: (bodyweightKg: number | null) => Promise<void>;
   pauseActiveWorkoutSession: () => Promise<void>;
   resumeActiveWorkoutSession: () => Promise<void>;
@@ -125,10 +142,17 @@ function getSessionSetNameLookupKey(exerciseName: string, setNumber: number): st
   return `${exerciseName.trim().toLowerCase()}:${setNumber}`;
 }
 
+/** Warm-ups never hold an exercise open: only working sets count as pending. */
+function isPendingWorkingSet(setEntry: ActiveWorkoutSet): boolean {
+  return !setEntry.isWarmup && setEntry.actualReps === 0;
+}
+
 function getExerciseCompletionCount(session: ActiveWorkoutSession, workoutExerciseId: string): number {
   return session.sets.filter(
     (setEntry) =>
-      setEntry.workoutExerciseId === workoutExerciseId && setEntry.actualReps > 0
+      setEntry.workoutExerciseId === workoutExerciseId &&
+      !setEntry.isWarmup &&
+      setEntry.actualReps > 0
   ).length;
 }
 
@@ -145,7 +169,7 @@ function getFirstPendingExerciseId(session: ActiveWorkoutSession): string | null
   for (const exerciseId of orderedExerciseIds) {
     const hasPendingSet = session.sets.some(
       (setEntry) =>
-        setEntry.workoutExerciseId === exerciseId && setEntry.actualReps === 0
+        setEntry.workoutExerciseId === exerciseId && isPendingWorkingSet(setEntry)
     );
 
     if (hasPendingSet) {
@@ -165,7 +189,7 @@ function getPreferredCurrentExerciseId(
     workoutExerciseId !== null &&
     session.sets.some(
       (setEntry) =>
-        setEntry.workoutExerciseId === workoutExerciseId && setEntry.actualReps === 0
+        setEntry.workoutExerciseId === workoutExerciseId && isPendingWorkingSet(setEntry)
     );
 
   if (hasPendingSets(preferredExerciseId)) {
@@ -197,7 +221,7 @@ function getNextCurrentExerciseIdAfterCompletion(
     const supersetHasPendingSet = session.sets.some(
       (setEntry) =>
         setEntry.workoutExerciseId === supersetExerciseId &&
-        setEntry.actualReps === 0
+        isPendingWorkingSet(setEntry)
     );
 
     if (supersetHasPendingSet && completedCount > supersetCompletedCount) {
@@ -209,7 +233,7 @@ function getNextCurrentExerciseIdAfterCompletion(
   const exerciseStillPending = session.sets.some(
     (setEntry) =>
       setEntry.workoutExerciseId === completedSet.workoutExerciseId &&
-      setEntry.actualReps === 0
+      isPendingWorkingSet(setEntry)
   );
 
   if (exerciseStillPending) {
@@ -241,7 +265,7 @@ function getRestTimerExerciseName(
   const exerciseStillPending = session.sets.some(
     (setEntry) =>
       setEntry.workoutExerciseId === completedSet.workoutExerciseId &&
-      setEntry.actualReps === 0
+      isPendingWorkingSet(setEntry)
   );
 
   if (exerciseStillPending) {
@@ -282,6 +306,10 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
   const lastSessionRepsByExerciseNameSet = new Map<string, number>();
 
   mostRecentSession?.sets.forEach((setEntry) => {
+    if (setEntry.isWarmup) {
+      return;
+    }
+
     if (Number.isFinite(setEntry.weightKg)) {
       lastSessionWeightByExerciseSet.set(
         getSessionSetIdLookupKey(setEntry.workoutExerciseId, setEntry.setNumber),
@@ -335,9 +363,48 @@ function buildSessionSets(workout: Workout): ActiveWorkoutSet[] {
         actualReps: 0,
         supersetExerciseId: exercise.supersetExerciseId,
         completedAt: null,
+        isWarmup: false,
       };
     });
   });
+}
+
+/** Most recent working set logged for an exercise name in any workout. */
+function getLastLoggedSetForExercise(
+  workouts: Workout[],
+  exerciseName: string
+): { weightKg: number; reps: number } | null {
+  const key = exerciseName.trim().toLowerCase();
+  let latest: { weightKg: number; reps: number; performedAt: number } | null = null;
+
+  workouts.forEach((workout) => {
+    workout.sessions.forEach((session) => {
+      if (latest && session.performedAt <= latest.performedAt) {
+        return;
+      }
+
+      const match = session.sets
+        .filter(
+          (setEntry) =>
+            !setEntry.isWarmup &&
+            setEntry.reps > 0 &&
+            setEntry.exerciseName.trim().toLowerCase() === key
+        )
+        .sort((a, b) => b.weightKg - a.weightKg)[0];
+
+      if (match) {
+        latest = { weightKg: match.weightKg, reps: match.reps, performedAt: session.performedAt };
+      }
+    });
+  });
+
+  return latest;
+}
+
+/** Rounds to the smallest plate jump people actually load: 2.5 kg or 5 lb. */
+function roundToPlateIncrementKg(weightKg: number, unit: WeightUnit): number {
+  const step = unit === 'kg' ? 2.5 : 5;
+  return convertUnitToKg(Math.round(convertKgToUnit(weightKg, unit) / step) * step, unit);
 }
 
 function getMostRecentBodyweightKg(workouts: Workout[]): number | null {
@@ -734,9 +801,180 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       currentExerciseId: workout.exercises[0]?.id ?? null,
       restTimer: null,
       sets: buildSessionSets(workout),
+      exerciseNotes: {},
     };
 
     void requestRestNotificationPermission().catch(() => false);
+    await saveActiveWorkoutSession(nextSession);
+    set({ activeSession: nextSession, error: null });
+  },
+  startEmptyWorkoutSession: async () => {
+    if (get().activeSession) {
+      throw new Error('Finish or discard the current active workout first.');
+    }
+
+    await ensureQuickWorkout();
+    const workouts = await listWorkouts();
+
+    const nextSession: ActiveWorkoutSession = {
+      workoutId: QUICK_WORKOUT_ID,
+      workoutName: QUICK_WORKOUT_NAME,
+      startedAt: Date.now(),
+      bodyweightKg: getMostRecentBodyweightKg(workouts),
+      totalPausedMs: 0,
+      pauseStartedAt: null,
+      isPaused: false,
+      restoredFromAppClose: false,
+      currentExerciseId: null,
+      restTimer: null,
+      sets: [],
+      exerciseNotes: {},
+    };
+
+    void requestRestNotificationPermission().catch(() => false);
+    await saveActiveWorkoutSession(nextSession);
+    set({ workouts, activeSession: nextSession, error: null });
+  },
+  addActiveSessionExercise: async ({ name, sets, reps, weightKg }) => {
+    const session = get().activeSession;
+    if (!session) {
+      return;
+    }
+
+    const exerciseName = name.trim();
+    if (!exerciseName) {
+      throw new Error('Exercise name is required.');
+    }
+
+    const lastSet = getLastLoggedSetForExercise(get().workouts, exerciseName);
+    const startWeightKg = weightKg ?? lastSet?.weightKg ?? 0;
+    const workoutExerciseId = createId('exercise');
+    const sortOrder =
+      session.sets.reduce((highest, setEntry) => Math.max(highest, setEntry.sortOrder), -1) + 1;
+
+    const newSets: ActiveWorkoutSet[] = Array.from(
+      { length: Math.max(1, Math.floor(sets)) },
+      (_, index) => ({
+        id: createId('active_set'),
+        workoutExerciseId,
+        exerciseName,
+        sortOrder,
+        setNumber: index + 1,
+        targetReps: Math.max(1, Math.floor(reps)),
+        previousReps: lastSet?.reps ?? null,
+        targetWeightKg: startWeightKg,
+        actualWeightKg: startWeightKg,
+        restSeconds: DEFAULT_REST_SECONDS,
+        actualReps: 0,
+        supersetExerciseId: null,
+        completedAt: null,
+        isWarmup: false,
+      })
+    );
+
+    const updatedSession = { ...session, sets: [...session.sets, ...newSets] };
+    const nextSession = {
+      ...updatedSession,
+      currentExerciseId: getPreferredCurrentExerciseId(
+        updatedSession,
+        session.currentExerciseId,
+        workoutExerciseId
+      ),
+    };
+
+    await saveActiveWorkoutSession(nextSession);
+    set({ activeSession: nextSession, error: null });
+  },
+  addWarmupSet: async (workoutExerciseId, unit) => {
+    const session = get().activeSession;
+    if (!session) {
+      return;
+    }
+
+    const exerciseSets = session.sets.filter(
+      (setEntry) => setEntry.workoutExerciseId === workoutExerciseId
+    );
+    const workingSet = exerciseSets
+      .filter((setEntry) => !setEntry.isWarmup)
+      .sort((a, b) => a.setNumber - b.setNumber)[0];
+
+    if (!workingSet) {
+      return;
+    }
+
+    const warmupCount = exerciseSets.filter((setEntry) => setEntry.isWarmup).length;
+    const step = WARMUP_RAMP[Math.min(warmupCount, WARMUP_RAMP.length - 1)];
+    // Bodyweight and assisted lifts have no load to ramp, so keep their weight.
+    const weightKg =
+      workingSet.actualWeightKg > 0
+        ? roundToPlateIncrementKg(workingSet.actualWeightKg * step.share, unit)
+        : workingSet.actualWeightKg;
+
+    const warmupSet: ActiveWorkoutSet = {
+      ...workingSet,
+      id: createId('active_set'),
+      setNumber: warmupCount + 1,
+      targetReps: step.reps,
+      previousReps: null,
+      targetWeightKg: weightKg,
+      actualWeightKg: weightKg,
+      actualReps: 0,
+      completedAt: null,
+      isWarmup: true,
+    };
+
+    const nextSession = { ...session, sets: [...session.sets, warmupSet] };
+
+    await saveActiveWorkoutSession(nextSession);
+    set({ activeSession: nextSession, error: null });
+  },
+  removeWarmupSet: async (setId) => {
+    const session = get().activeSession;
+    const removed = session?.sets.find((setEntry) => setEntry.id === setId);
+
+    if (!session || !removed?.isWarmup) {
+      return;
+    }
+
+    // Renumber the remaining warm-ups so they stay W1, W2, ...
+    const warmupNumbers = new Map(
+      session.sets
+        .filter(
+          (setEntry) =>
+            setEntry.isWarmup &&
+            setEntry.id !== setId &&
+            setEntry.workoutExerciseId === removed.workoutExerciseId
+        )
+        .sort((a, b) => a.setNumber - b.setNumber)
+        .map((setEntry, index) => [setEntry.id, index + 1])
+    );
+    const remainingSets = session.sets
+      .filter((setEntry) => setEntry.id !== setId)
+      .map((setEntry) => {
+        const setNumber = warmupNumbers.get(setEntry.id);
+        return setNumber === undefined || setNumber === setEntry.setNumber
+          ? setEntry
+          : { ...setEntry, setNumber };
+      });
+
+    const nextSession = { ...session, sets: remainingSets };
+
+    await saveActiveWorkoutSession(nextSession);
+    set({ activeSession: nextSession, error: null });
+  },
+  setActiveSessionExerciseNote: async (workoutExerciseId, note) => {
+    const session = get().activeSession;
+    if (!session) {
+      return;
+    }
+
+    const trimmed = note.trim();
+    const { [workoutExerciseId]: _previous, ...otherNotes } = session.exerciseNotes;
+    const nextSession = {
+      ...session,
+      exerciseNotes: trimmed ? { ...otherNotes, [workoutExerciseId]: trimmed } : otherNotes,
+    };
+
     await saveActiveWorkoutSession(nextSession);
     set({ activeSession: nextSession, error: null });
   },
@@ -809,11 +1047,19 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       changed = true;
 
       if (setEntry.actualReps === 0) {
-        completedSet = {
+        const nextSet = {
           ...setEntry,
           actualReps: setEntry.targetReps,
           completedAt,
         };
+
+        // Warm-ups lead straight into the next set: no rest, focus stays put.
+        if (setEntry.isWarmup) {
+          decrementedExerciseId = setEntry.workoutExerciseId;
+          return nextSet;
+        }
+
+        completedSet = nextSet;
         completedSupersetExerciseId = setEntry.supersetExerciseId;
         shouldStartRest = true;
         return completedSet;
@@ -919,16 +1165,17 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
 
     let changed = false;
+    // Warm-ups and working sets ramp separately, so a scope never crosses between them.
+    const isSameKind = (setEntry: ActiveWorkoutSet) =>
+      setEntry.workoutExerciseId === selectedSet.workoutExerciseId &&
+      setEntry.isWarmup === selectedSet.isWarmup;
     const shouldApplyWeight = (setEntry: ActiveWorkoutSet) => {
       if (weightScope === "all") {
-        return setEntry.workoutExerciseId === selectedSet.workoutExerciseId;
+        return isSameKind(setEntry);
       }
 
       if (weightScope === "remaining") {
-        return (
-          setEntry.workoutExerciseId === selectedSet.workoutExerciseId &&
-          setEntry.setNumber >= selectedSet.setNumber
-        );
+        return isSameKind(setEntry) && setEntry.setNumber >= selectedSet.setNumber;
       }
 
       return setEntry.id === setId;
@@ -985,7 +1232,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const normalizedSets = Math.max(1, Math.floor(sets));
     const normalizedReps = Math.max(1, Math.floor(reps));
     const selectedSets = session.sets
-      .filter((setEntry) => setEntry.workoutExerciseId === workoutExerciseId)
+      .filter(
+        (setEntry) => setEntry.workoutExerciseId === workoutExerciseId && !setEntry.isWarmup
+      )
       .sort((a, b) => a.setNumber - b.setNumber);
 
     if (selectedSets.length === 0) {
@@ -1054,7 +1303,15 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     const nextSession = {
       ...session,
       sets: [
-        ...session.sets.filter((setEntry) => setEntry.workoutExerciseId !== workoutExerciseId),
+        ...session.sets
+          .filter(
+            (setEntry) => setEntry.workoutExerciseId !== workoutExerciseId || setEntry.isWarmup
+          )
+          .map((setEntry) =>
+            setEntry.workoutExerciseId === workoutExerciseId
+              ? { ...setEntry, exerciseName: normalizedExerciseName }
+              : setEntry
+          ),
         ...nextExerciseSets,
       ],
     };
@@ -1092,7 +1349,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         durationMs: getElapsedSessionMs(session, finishedAt),
         bodyweightKg: session.bodyweightKg,
         sets: session.sets
-          .slice()
+          // An untouched warm-up is just a suggestion; only keep the ones done.
+          .filter((setEntry) => !setEntry.isWarmup || setEntry.actualReps > 0)
           .sort((a, b) => {
             // Completed sets first, ordered by completion time
             if (a.completedAt !== null && b.completedAt !== null) {
@@ -1109,7 +1367,20 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
             setNumber: setEntry.setNumber,
             reps: setEntry.actualReps,
             weightKg: setEntry.actualWeightKg,
+            isWarmup: setEntry.isWarmup,
           })),
+        exerciseNotes: Object.entries(session.exerciseNotes).flatMap(
+          ([workoutExerciseId, note]) => {
+            const exerciseName = session.sets.find(
+              (setEntry) => setEntry.workoutExerciseId === workoutExerciseId
+            )?.exerciseName;
+            const trimmed = note.trim();
+
+            return exerciseName && trimmed
+              ? [{ workoutExerciseId, exerciseName, note: trimmed }]
+              : [];
+          }
+        ),
       });
 
       const workouts = await listWorkouts();

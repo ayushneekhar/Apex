@@ -6,8 +6,13 @@ export type WorkoutSessionSetGroup = {
   sets: WorkoutSessionSet[];
 };
 
+/** Sets that count toward stats: everything except warm-ups. */
+export function getWorkingSets<T extends { isWarmup: boolean }>(sets: T[]): T[] {
+  return sets.filter((setEntry) => !setEntry.isWarmup);
+}
+
 export function getWorkoutSessionVolumeKg(session: WorkoutSession): number {
-  return session.sets.reduce(
+  return getWorkingSets(session.sets).reduce(
     (total, setEntry) => total + Math.abs(setEntry.weightKg) * setEntry.reps,
     0
   );
@@ -41,7 +46,10 @@ export function groupWorkoutSessionSets(
     return {
       workoutExerciseId,
       exerciseName: group?.exerciseName ?? '',
-      sets: [...(group?.sets ?? [])].sort((a, b) => a.setNumber - b.setNumber),
+      // Warm-ups lead, then working sets, each in set order.
+      sets: [...(group?.sets ?? [])].sort(
+        (a, b) => Number(b.isWarmup) - Number(a.isWarmup) || a.setNumber - b.setNumber
+      ),
     };
   });
 }

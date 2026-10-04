@@ -144,7 +144,8 @@ export function SessionSummaryCard({
           value={String(
             Math.max(
               0,
-              activeSession.sets.length - controller.completedSetCount
+              activeSession.sets.filter((setEntry) => !setEntry.isWarmup).length -
+                controller.completedSetCount
             )
           )}
         />

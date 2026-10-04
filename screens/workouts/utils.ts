@@ -71,25 +71,30 @@ export function groupActiveSetsByExercise(sets: ActiveWorkoutSet[]): ActiveSetGr
       supersetExerciseId: setEntry.supersetExerciseId,
       supersetExerciseName: null,
       sets: [setEntry],
+      warmupSets: [],
     });
     order.push(setEntry.workoutExerciseId);
   });
 
   return order.map((workoutExerciseId) => {
     const group = groups.get(workoutExerciseId);
+    const bySetNumber = (a: ActiveWorkoutSet, b: ActiveWorkoutSet) => a.setNumber - b.setNumber;
+    const workingSets = (group?.sets ?? []).filter((setEntry) => !setEntry.isWarmup);
 
     return {
       workoutExerciseId,
       exerciseName: group?.exerciseName ?? '',
       sortOrder: group?.sortOrder ?? 0,
-      targetWeightKg: group?.targetWeightKg ?? 0,
+      // Warm-ups ramp below the working weight, so the target comes from working sets.
+      targetWeightKg: workingSets[0]?.targetWeightKg ?? group?.targetWeightKg ?? 0,
       restSeconds: group?.restSeconds ?? DEFAULT_REST_SECONDS,
       supersetExerciseId: group?.supersetExerciseId ?? null,
       supersetExerciseName:
         group?.supersetExerciseId
           ? exerciseNameById.get(group.supersetExerciseId) ?? null
           : null,
-      sets: [...(group?.sets ?? [])].sort((a, b) => a.setNumber - b.setNumber),
+      sets: workingSets.sort(bySetNumber),
+      warmupSets: (group?.sets ?? []).filter((setEntry) => setEntry.isWarmup).sort(bySetNumber),
     };
   });
 }

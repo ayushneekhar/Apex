@@ -11,6 +11,7 @@ import type { AppTheme } from '@/constants/app-themes';
 import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
+  getWorkingSets,
   getWorkoutSessionVolumeKg,
   groupWorkoutSessionSets,
 } from '@/lib/workout-session';
@@ -190,7 +191,7 @@ function buildSessionRow(
     dayKey: toLocalDateKey(session.performedAt),
     monthKey: toLocalMonthKey(session.performedAt),
     exercisePreview: getExercisePreview(session),
-    setCount: session.sets.length,
+    setCount: getWorkingSets(session.sets).length,
     volumeKg,
     durationLabel: session.durationMs === null ? null : formatDuration(session.durationMs),
     volumeLabel: formatWeightFromKg(volumeKg, weightUnit),

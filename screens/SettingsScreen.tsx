@@ -7,6 +7,7 @@ import { NeonButton } from "@/components/ui/neon-button";
 import { NeonGridBackground } from "@/components/ui/neon-grid-background";
 import { THEME_OPTIONS } from "@/constants/app-themes";
 import { designTokens } from "@/constants/design-system";
+import { QUICK_WORKOUT_ID } from "@/constants/workout";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import {
   checkNitroOtaForUpdates,
@@ -51,7 +52,8 @@ export default function SettingsScreen() {
   const archivedWorkouts = useMemo(
     () =>
       workouts
-        .filter((workout) => workout.archivedAt !== null)
+        // The quick-workout row is stored archived but isn't a template.
+        .filter((workout) => workout.archivedAt !== null && workout.id !== QUICK_WORKOUT_ID)
         .sort((a, b) => (b.archivedAt ?? 0) - (a.archivedAt ?? 0)),
     [workouts]
   );

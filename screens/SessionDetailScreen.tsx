@@ -20,6 +20,7 @@ import type { AppTheme } from '@/constants/app-themes';
 import { designTokens } from '@/constants/design-system';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
+  getWorkingSets,
   getWorkoutSessionVolumeKg,
   groupWorkoutSessionSets,
 } from '@/lib/workout-session';
@@ -48,6 +49,7 @@ type SessionSetDraft = {
   workoutExerciseId: string;
   exerciseName: string;
   setNumber: number;
+  isWarmup: boolean;
   repsInput: string;
   weightInput: string;
 };
@@ -59,7 +61,7 @@ function createSessionSetDrafts(
   return [...session.sets]
     .sort((a, b) => {
       if (a.exerciseName === b.exerciseName) {
-        return a.setNumber - b.setNumber;
+        return Number(b.isWarmup) - Number(a.isWarmup) || a.setNumber - b.setNumber;
       }
 
       return a.exerciseName.localeCompare(b.exerciseName);
@@ -69,6 +71,7 @@ function createSessionSetDrafts(
       workoutExerciseId: setEntry.workoutExerciseId,
       exerciseName: setEntry.exerciseName,
       setNumber: setEntry.setNumber,
+      isWarmup: setEntry.isWarmup,
       repsInput: String(setEntry.reps),
       weightInput: formatWeightInputFromKg(setEntry.weightKg, weightUnit),
     }));
@@ -145,7 +148,11 @@ export default function SessionDetailScreen() {
     }));
   }, [draftSets, session?.sets]);
 
-  const totalReps = session?.sets.reduce((sum, setEntry) => sum + setEntry.reps, 0) ?? 0;
+  const workingSets = getWorkingSets(session?.sets ?? []);
+  const totalReps = workingSets.reduce((sum, setEntry) => sum + setEntry.reps, 0);
+  const notesByExerciseId = new Map(
+    (session?.exerciseNotes ?? []).map((entry) => [entry.workoutExerciseId, entry.note])
+  );
   const totalVolumeKg = session ? getWorkoutSessionVolumeKg(session) : 0;
   const durationLabel =
     session?.durationMs === null || session?.durationMs === undefined
@@ -198,15 +205,16 @@ export default function SessionDetailScreen() {
     const parsedSets = [];
 
     for (const draft of draftSets) {
+      const setLabel = draft.isWarmup ? `warm-up ${draft.setNumber}` : `set ${draft.setNumber}`;
       const reps = Number.parseInt(draft.repsInput, 10);
       if (!Number.isFinite(reps) || reps < 0) {
-        setEditError(`Reps for ${draft.exerciseName} set ${draft.setNumber} must be zero or above.`);
+        setEditError(`Reps for ${draft.exerciseName} ${setLabel} must be zero or above.`);
         return;
       }
 
       const parsedWeight = parseWeightInputToKg(draft.weightInput, settings.weightUnit);
       if (parsedWeight === null) {
-        setEditError(`Weight for ${draft.exerciseName} set ${draft.setNumber} is invalid.`);
+        setEditError(`Weight for ${draft.exerciseName} ${setLabel} is invalid.`);
         return;
       }
 
@@ -216,6 +224,7 @@ export default function SessionDetailScreen() {
         setNumber: draft.setNumber,
         reps,
         weightKg: parsedWeight,
+        isWarmup: draft.isWarmup,
       });
     }
 
@@ -311,7 +320,7 @@ export default function SessionDetailScreen() {
 
   const summaryStats = [
     { label: 'Duration', value: durationLabel },
-    { label: 'Sets', value: String(session.sets.length) },
+    { label: 'Sets', value: String(workingSets.length) },
     { label: 'Reps', value: String(totalReps) },
   ];
 
@@ -408,7 +417,8 @@ export default function SessionDetailScreen() {
         </View>
 
         {groupedSessionSets.map((group) => {
-          const groupVolumeKg = group.sets.reduce(
+          const groupNote = notesByExerciseId.get(group.workoutExerciseId);
+          const groupVolumeKg = getWorkingSets(group.sets).reduce(
             (total, setEntry) => total + Math.abs(setEntry.weightKg) * setEntry.reps,
             0
           );
@@ -432,6 +442,19 @@ export default function SessionDetailScreen() {
                   {formatWeightFromKg(groupVolumeKg, settings.weightUnit)}
                 </AppText>
               </View>
+
+              {groupNote ? (
+                <View style={styles.noteLine}>
+                  <Ionicons
+                    name="document-text-outline"
+                    size={12}
+                    color={theme.palette.textMuted}
+                  />
+                  <AppText tone="muted" style={styles.noteText}>
+                    {groupNote}
+                  </AppText>
+                </View>
+              ) : null}
 
               <View style={[styles.setTableHeader, { borderBottomColor: theme.palette.border }]}>
                 <AppText variant="micro" tone="muted" style={styles.setNumberColumn}>
@@ -458,19 +481,21 @@ export default function SessionDetailScreen() {
                       <View
                         style={[
                           styles.setNumberBadge,
-                          {
-                            backgroundColor: setEntry.reps > 0
-                              ? theme.palette.accent
-                              : theme.palette.panelSoft,
-                          },
+                          setEntry.isWarmup
+                            ? { borderWidth: 1, borderColor: theme.palette.border }
+                            : {
+                                backgroundColor: setEntry.reps > 0
+                                  ? theme.palette.accent
+                                  : theme.palette.panelSoft,
+                              },
                         ]}
                       >
                         <AppText
                           variant="micro"
-                          tone={setEntry.reps > 0 ? 'inverse' : 'muted'}
+                          tone={!setEntry.isWarmup && setEntry.reps > 0 ? 'inverse' : 'muted'}
                           style={styles.setNumberText}
                         >
-                          {setEntry.setNumber}
+                          {setEntry.isWarmup ? `W${setEntry.setNumber}` : setEntry.setNumber}
                         </AppText>
                       </View>
                     </View>

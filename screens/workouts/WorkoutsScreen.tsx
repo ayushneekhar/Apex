@@ -6,7 +6,7 @@ import { NeonGridBackground } from "@/components/ui/neon-grid-background";
 import { designTokens } from "@/constants/design-system";
 
 import { ActiveSessionOverlay } from "./components/ActiveSessionOverlay";
-import { LevelBadge } from "./components/LevelBadge";
+import { ProgressStrip } from "./components/ProgressStrip";
 import { SavedWorkoutsSection } from "./components/SavedWorkoutsSection";
 import { TrackerHeroCard } from "./components/TrackerHeroCard";
 import { useWorkoutsScreenController } from "./hooks/use-workouts-screen-controller";
@@ -44,9 +44,11 @@ export default function WorkoutsScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.keyboardRoot}
       >
-        <View style={styles.topRow}>
-          <LevelBadge theme={controller.theme} level={controller.level} />
-        </View>
+        <ProgressStrip
+          theme={controller.theme}
+          weekStreak={controller.weekStreak}
+          level={controller.level}
+        />
 
         {!controller.moveTrackerCardToBottom ? (
           <TrackerHeroCard controller={controller} />

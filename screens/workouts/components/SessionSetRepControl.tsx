@@ -127,7 +127,9 @@ export function SessionSetRepControl({
       <View
         accessible
         accessibilityRole="adjustable"
-        accessibilityLabel={`Set ${setEntry.setNumber}`}
+        accessibilityLabel={
+          setEntry.isWarmup ? `Warm-up ${setEntry.setNumber}` : `Set ${setEntry.setNumber}`
+        }
         accessibilityValue={{
           text: setEntry.actualReps > 0
             ? `${setEntry.actualReps} of ${setEntry.targetReps} reps`
@@ -166,10 +168,10 @@ export function SessionSetRepControl({
       >
         <SetRepMeter
           theme={theme}
-          setNumber={setEntry.setNumber}
+          label={setEntry.isWarmup ? `W${setEntry.setNumber}` : `Set ${setEntry.setNumber}`}
           actualReps={previewReps ?? committingReps ?? setEntry.actualReps}
           targetReps={setEntry.targetReps}
-          previousReps={setEntry.previousReps}
+          previousReps={setEntry.isWarmup ? undefined : setEntry.previousReps}
         />
       </View>
     </GestureDetector>

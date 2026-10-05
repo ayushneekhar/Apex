@@ -53,7 +53,6 @@ Create workout templates, track every set in real time, and watch your progress 
 | 📊 | **Analytics & Charts** | Visualize strength gains, volume, and trends over time |
 | 📅 | **Calendar History** | See every session at a glance with a calendar view |
 | ☁️ | **Google Drive Backup** | Sync your data across devices via Google Drive |
-| 🎵 | **Spotify Integration** | Control your music without leaving the app |
 | 🔔 | **Smart Notifications** | Rest timer alerts so you never miss a set |
 | 🔄 | **OTA Updates** | Get the latest features instantly — no reinstall needed |
 | 🌙 | **Themes** | Multiple color themes with dark mode support |
@@ -80,7 +79,7 @@ Grab the latest APK from the [**Releases**](https://github.com/ayushneekhar/Apex
 | Navigation | React Navigation |
 | Charts | react-native-gifted-charts |
 | OTA Updates | react-native-nitro-ota |
-| Auth | expo-auth-session (Spotify, Google) |
+| Auth | expo-auth-session (Google) |
 | Haptics | react-native-nitro-haptics |
 
 ---

@@ -350,7 +350,23 @@ export async function connectGoogleDrive(): Promise<boolean> {
 }
 
 export async function disconnectGoogleDrive(): Promise<void> {
+  const session = await loadGoogleDriveSession();
   await SecureStore.deleteItemAsync(GOOGLE_SESSION_STORE_KEY);
+
+  if (!session) {
+    return;
+  }
+
+  // Revoking the refresh token also invalidates its access tokens. Best effort:
+  // the local session is already gone, so a network failure shouldn't block disconnect.
+  try {
+    await AuthSession.revokeAsync(
+      { token: session.refreshToken ?? session.accessToken },
+      GOOGLE_DISCOVERY
+    );
+  } catch {
+    // Ignore — the user can still remove access from their Google Account settings.
+  }
 }
 
 export async function isGoogleDriveConnected(): Promise<boolean> {

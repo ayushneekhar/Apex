@@ -15,7 +15,7 @@ Apex is a React Native (bare workflow + Expo Modules) fitness/workout tracker ap
 | Path | Contents |
 |---|---|
 | `screens/` | All app screens (workouts, history, analytics, settings, etc.) |
-| `lib/` | Core utilities (database, backups, haptics, Spotify, etc.) |
+| `lib/` | Core utilities (database, backups, haptics, OTA, etc.) |
 | `store/` | Zustand state management |
 | `types/` | TypeScript type definitions |
 | `android/` | Native Android project |

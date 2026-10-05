@@ -1,15 +1,10 @@
 {
-  "version": "14",
+  "version": "15",
   "isSemver": false,
   "targetVersions": {
     "android": [
-      "1.1.1+10"
+      "1.1.1+11"
     ]
   },
-  "releaseNotes": "Auto OTA from main (14a4868)",
-  "patches": {
-    "11": "patches/11-14.zip",
-    "12": "patches/12-14.zip",
-    "13": "patches/13-14.zip"
-  }
+  "releaseNotes": "Native release v1.1.1+11"
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { View } from 'react-native';
 import Animated, {
   Easing,
@@ -73,7 +73,9 @@ function SetRepMeterLabels({
  * is clipped to the fill so text reads correctly on either side of the edge.
  */
 export function SetRepMeter({ theme, ...labelProps }: SetRepMeterProps) {
-  const [meterHeight, setMeterHeight] = useState(0);
+  // Kept as a shared value (not React state) so the fill worklet re-runs when
+  // layout settles; a JS closure value could leave the fill stuck at 0.
+  const meterHeight = useSharedValue(0);
   const fraction = getFillFraction(labelProps.actualReps, labelProps.targetReps);
   const progress = useSharedValue(fraction);
 
@@ -85,14 +87,18 @@ export function SetRepMeter({ theme, ...labelProps }: SetRepMeterProps) {
   }, [fraction, progress]);
 
   const fillStyle = useAnimatedStyle(() => ({
-    height: progress.value * meterHeight,
+    height: progress.value * meterHeight.value,
+  }));
+
+  const inverseLabelsStyle = useAnimatedStyle(() => ({
+    height: meterHeight.value,
   }));
 
   return (
     <View
       style={styles.meter}
       onLayout={(event) => {
-        setMeterHeight(event.nativeEvent.layout.height);
+        meterHeight.set(event.nativeEvent.layout.height);
       }}
     >
       <View style={styles.labels}>
@@ -103,9 +109,9 @@ export function SetRepMeter({ theme, ...labelProps }: SetRepMeterProps) {
         pointerEvents="none"
         style={[styles.fill, { backgroundColor: theme.palette.accent }, fillStyle]}
       >
-        <View style={[styles.labels, styles.inverseLabels, { height: meterHeight }]}>
+        <Animated.View style={[styles.labels, styles.inverseLabels, inverseLabelsStyle]}>
           <SetRepMeterLabels {...labelProps} inverse />
-        </View>
+        </Animated.View>
       </Animated.View>
     </View>
   );

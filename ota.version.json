@@ -1,15 +1,16 @@
 {
-  "version": "14",
+  "version": "16",
   "isSemver": false,
   "targetVersions": {
     "ios": [
       "1.1.1+4"
     ]
   },
-  "releaseNotes": "Auto OTA from main (14a4868)",
+  "releaseNotes": "Auto OTA from main (7180fef)",
   "patches": {
-    "10": "patches/10-14.zip",
-    "12": "patches/12-14.zip",
-    "13": "patches/13-14.zip"
+    "10": "patches/10-16.zip",
+    "12": "patches/12-16.zip",
+    "13": "patches/13-16.zip",
+    "14": "patches/14-16.zip"
   }
 }
